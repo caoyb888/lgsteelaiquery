@@ -1,0 +1,94 @@
+name: lgsteel_dev
+
+networks:
+  lgsteel_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.1.0/24
+
+volumes:
+  lgsteel_dev_meta_db_data:
+  lgsteel_dev_biz_db_data:
+  lgsteel_dev_redis_data:
+  lgsteel_dev_chroma_data:
+  lgsteel_dev_excel_files:
+
+services:
+
+  meta_db:
+    container_name: lgsteel_dev_meta_db
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: lgsteel_meta
+      POSTGRES_USER: ${META_DB_USER:-lgsteel_meta_user}
+      POSTGRES_PASSWORD: ${META_DB_PASSWORD:-dev_meta_pass_change_me}
+    volumes:
+      - lgsteel_dev_meta_db_data:/var/lib/postgresql/data
+      - ./scripts/init_meta.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+    ports:
+      - "127.0.0.1:5441:5432"
+    networks:
+      - lgsteel_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${META_DB_USER:-lgsteel_meta_user} -d lgsteel_meta"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    labels:
+      project: lgsteel_dev
+
+  biz_db:
+    container_name: lgsteel_dev_biz_db
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: lgsteel_biz
+      POSTGRES_USER: ${BIZ_DB_USER:-lgsteel_biz_user}
+      POSTGRES_PASSWORD: ${BIZ_DB_PASSWORD:-dev_biz_pass_change_me}
+    volumes:
+      - lgsteel_dev_biz_db_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5442:5432"
+    networks:
+      - lgsteel_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${BIZ_DB_USER:-lgsteel_biz_user} -d lgsteel_biz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    labels:
+      project: lgsteel_dev
+
+  redis:
+    container_name: lgsteel_dev_redis
+    image: redis:7-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD:-dev_redis_pass_change_me} --appendonly yes
+    volumes:
+      - lgsteel_dev_redis_data:/data
+    ports:
+      - "127.0.0.1:6391:6379"
+    networks:
+      - lgsteel_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-dev_redis_pass_change_me}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    labels:
+      project: lgsteel_dev
+
+  chromadb:
+    container_name: lgsteel_dev_chromadb
+    image: chromadb/chroma:latest
+    volumes:
+      - lgsteel_dev_chroma_data:/chroma/chroma
+    ports:
+      - "127.0.0.1:8191:8000"
+    networks:
+      - lgsteel_net
+    restart: unless-stopped
+    labels:
+      project: lgsteel_dev

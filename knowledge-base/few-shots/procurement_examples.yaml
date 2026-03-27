@@ -1,0 +1,154 @@
+# ============================================================
+# 采购域 Few-shot 示例库（种子版 10 条）
+# ============================================================
+
+domain: procurement
+version: "1.0"
+updated_at: "2026-03-27"
+
+examples:
+
+  - id: proc_001
+    difficulty: easy
+    question: "近三个月焦炭的平均采购价格是多少？"
+    sql: |
+      SELECT AVG(unit_price) AS avg_unit_price
+      FROM procurement_records
+      WHERE material_name LIKE '%焦炭%'
+        AND purchase_date >= CURRENT_DATE - INTERVAL '3 months'
+    expected_result_type: single_value
+    tags: [average, coke, three_months]
+
+  - id: proc_002
+    difficulty: medium
+    question: "本月各供应商的采购金额占比是多少？"
+    sql: |
+      SELECT supplier_name,
+             SUM(total_amount) AS supplier_amount,
+             ROUND(SUM(total_amount) * 100.0 / SUM(SUM(total_amount)) OVER (), 2) AS percentage
+      FROM procurement_records
+      WHERE purchase_date >= DATE_TRUNC('month', CURRENT_DATE)
+      GROUP BY supplier_name
+      ORDER BY supplier_amount DESC
+    expected_result_type: pie_chart
+    tags: [percentage, supplier, pie]
+
+  - id: proc_003
+    difficulty: easy
+    question: "本月采购总金额是多少？"
+    sql: |
+      SELECT SUM(total_amount) AS total_procurement
+      FROM procurement_records
+      WHERE purchase_date >= DATE_TRUNC('month', CURRENT_DATE)
+    expected_result_type: single_value
+    tags: [aggregation, current_month]
+
+  - id: proc_004
+    difficulty: medium
+    question: "各主要原料的本月采购量和金额"
+    sql: |
+      SELECT material_name,
+             SUM(purchase_quantity) AS total_quantity,
+             SUM(total_amount)      AS total_amount
+      FROM procurement_records
+      WHERE purchase_date >= DATE_TRUNC('month', CURRENT_DATE)
+      GROUP BY material_name
+      ORDER BY total_amount DESC
+    expected_result_type: table
+    tags: [groupby, material, current_month]
+
+  - id: proc_005
+    difficulty: hard
+    question: "焦炭近6个月的月均价格趋势"
+    sql: |
+      SELECT TO_CHAR(DATE_TRUNC('month', purchase_date), 'YYYY-MM') AS month,
+             AVG(unit_price) AS avg_price
+      FROM procurement_records
+      WHERE material_name LIKE '%焦炭%'
+        AND purchase_date >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '5 months'
+      GROUP BY DATE_TRUNC('month', purchase_date)
+      ORDER BY month
+    expected_result_type: line_chart
+    tags: [trend, price, coke, six_months]
+
+  - id: proc_006
+    difficulty: medium
+    question: "采购金额最大的前5个供应商"
+    sql: |
+      SELECT supplier_name,
+             SUM(total_amount) AS total_procurement
+      FROM procurement_records
+      WHERE purchase_date >= DATE_TRUNC('year', CURRENT_DATE)
+      GROUP BY supplier_name
+      ORDER BY total_procurement DESC
+      LIMIT 5
+    expected_result_type: table
+    tags: [ranking, supplier, ytd]
+
+  - id: proc_007
+    difficulty: hard
+    question: "同种原料不同供应商的本月均价对比"
+    sql: |
+      SELECT material_name,
+             supplier_name,
+             AVG(unit_price) AS avg_unit_price,
+             SUM(purchase_quantity) AS total_quantity
+      FROM procurement_records
+      WHERE purchase_date >= DATE_TRUNC('month', CURRENT_DATE)
+      GROUP BY material_name, supplier_name
+      ORDER BY material_name, avg_unit_price ASC
+    expected_result_type: table
+    tags: [comparison, supplier, price, current_month]
+
+  - id: proc_008
+    difficulty: easy
+    question: "铁矿石本月的采购总量是多少吨？"
+    sql: |
+      SELECT SUM(purchase_quantity) AS total_quantity
+      FROM procurement_records
+      WHERE material_name LIKE '%铁矿石%'
+        AND purchase_date >= DATE_TRUNC('month', CURRENT_DATE)
+    expected_result_type: single_value
+    tags: [aggregation, iron_ore, current_month]
+
+  - id: proc_009
+    difficulty: medium
+    question: "本月与上月采购总金额对比"
+    sql: |
+      SELECT
+        SUM(CASE WHEN purchase_date >= DATE_TRUNC('month', CURRENT_DATE)
+                 THEN total_amount ELSE 0 END) AS current_month,
+        SUM(CASE WHEN purchase_date >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month'
+                  AND purchase_date <  DATE_TRUNC('month', CURRENT_DATE)
+                 THEN total_amount ELSE 0 END) AS last_month
+      FROM procurement_records
+      WHERE purchase_date >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month'
+    expected_result_type: table
+    tags: [mom, comparison]
+
+  - id: proc_010
+    difficulty: medium
+    question: "各原料本月采购单价与上月相比涨跌情况"
+    sql: |
+      SELECT cur.material_name,
+             cur.avg_price AS current_price,
+             prev.avg_price AS last_price,
+             ROUND(cur.avg_price - prev.avg_price, 2) AS price_change,
+             ROUND((cur.avg_price - prev.avg_price) * 100.0
+                   / NULLIF(prev.avg_price, 0), 2) AS change_pct
+      FROM (
+        SELECT material_name, AVG(unit_price) AS avg_price
+        FROM procurement_records
+        WHERE purchase_date >= DATE_TRUNC('month', CURRENT_DATE)
+        GROUP BY material_name
+      ) cur
+      JOIN (
+        SELECT material_name, AVG(unit_price) AS avg_price
+        FROM procurement_records
+        WHERE purchase_date >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month'
+          AND purchase_date <  DATE_TRUNC('month', CURRENT_DATE)
+        GROUP BY material_name
+      ) prev USING (material_name)
+      ORDER BY change_pct DESC
+    expected_result_type: table
+    tags: [mom, price_change, material]

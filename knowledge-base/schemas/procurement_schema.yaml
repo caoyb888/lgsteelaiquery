@@ -1,0 +1,81 @@
+# ============================================================
+# 采购域 — 数据字典 Schema
+# ============================================================
+
+domain: procurement
+display_name: 采购数据
+description: 采购部采购台账、供应商价格对比、入库记录等
+
+tables:
+
+  - table_key: procurement_records
+    display_name: 采购台账
+    description: 采购合同明细，含供应商、物料、价格、数量
+    primary_keys: [order_no, material_name, supplier_name]
+    update_frequency: monthly
+    fields:
+      - std_name: order_no
+        display_name: 采购合同号
+        field_type: text
+        required: false
+      - std_name: purchase_date
+        display_name: 采购日期
+        field_type: date
+        required: true
+      - std_name: material_name
+        display_name: 物料名称
+        field_type: text
+        required: true
+        example_values: [焦炭, 铁矿石, 废钢, 石灰石, 合金]
+      - std_name: supplier_name
+        display_name: 供应商名称
+        field_type: text
+        required: true
+      - std_name: purchase_quantity
+        display_name: 采购数量
+        field_type: float
+        unit: 吨
+        required: true
+      - std_name: unit_price
+        display_name: 采购单价
+        field_type: float
+        unit: 元/吨
+        required: true
+      - std_name: total_amount
+        display_name: 采购金额
+        field_type: float
+        unit: 万元
+        required: true
+        derived: "purchase_quantity * unit_price / 10000"
+
+  - table_key: procurement_price_comparison
+    display_name: 供应商价格对比
+    description: 同类物料不同供应商的历史报价对比
+    primary_keys: [material_name, supplier_name, report_month]
+    update_frequency: monthly
+    fields:
+      - std_name: report_month
+        display_name: 报价月份
+        field_type: date
+        required: true
+      - std_name: material_name
+        display_name: 物料名称
+        field_type: text
+        required: true
+      - std_name: supplier_name
+        display_name: 供应商名称
+        field_type: text
+        required: true
+      - std_name: unit_price
+        display_name: 报价单价
+        field_type: float
+        unit: 元/吨
+        required: true
+
+join_keys:
+  - from_table: procurement_records
+    to_table: procurement_price_comparison
+    keys: [material_name, supplier_name]
+  - from_table: procurement_records
+    to_table: production_monthly_summary
+    keys: [report_month]

@@ -1,0 +1,508 @@
+# 采购域 SQL 准确率测试用例
+domain: procurement
+cases:
+
+  # ============================================================
+  # Easy
+  # ============================================================
+
+  - id: pro_easy_001
+    difficulty: easy
+    question: 查询所有采购记录
+    gold_sql: "SELECT * FROM {procurement_table};"
+    tags: [select_all]
+
+  - id: pro_easy_002
+    difficulty: easy
+    question: 统计采购记录总数
+    gold_sql: "SELECT COUNT(*) AS total FROM {procurement_table};"
+    tags: [count]
+
+  - id: pro_easy_003
+    difficulty: easy
+    question: 查询各月份的总采购金额
+    gold_sql: >
+      SELECT order_month, SUM(amount) AS total_amount
+      FROM {procurement_table}
+      GROUP BY order_month
+      ORDER BY order_month;
+    tags: [group_by, sum]
+
+  - id: pro_easy_004
+    difficulty: easy
+    question: 查询各供应商的总采购金额
+    gold_sql: >
+      SELECT supplier, SUM(amount) AS total_amount
+      FROM {procurement_table}
+      GROUP BY supplier
+      ORDER BY total_amount DESC;
+    tags: [group_by, sum]
+
+  - id: pro_easy_005
+    difficulty: easy
+    question: 查询2026年1月的采购记录
+    gold_sql: >
+      SELECT * FROM {procurement_table}
+      WHERE order_month = '2026-01';
+    tags: [filter, date]
+
+  - id: pro_easy_006
+    difficulty: easy
+    question: 查询铁矿石的所有采购记录
+    gold_sql: >
+      SELECT * FROM {procurement_table}
+      WHERE material_name = '铁矿石';
+    tags: [filter, string]
+
+  - id: pro_easy_007
+    difficulty: easy
+    question: 按采购金额从高到低排列，取前5条
+    gold_sql: >
+      SELECT * FROM {procurement_table}
+      ORDER BY amount DESC
+      LIMIT 5;
+    tags: [order_by, limit]
+
+  - id: pro_easy_008
+    difficulty: easy
+    question: 计算总采购金额
+    gold_sql: "SELECT SUM(amount) AS total_amount FROM {procurement_table};"
+    tags: [sum]
+
+  - id: pro_easy_009
+    difficulty: easy
+    question: 查询采购单价高于500元/吨的记录
+    gold_sql: >
+      SELECT * FROM {procurement_table}
+      WHERE unit_price > 500;
+    tags: [filter, numeric]
+
+  - id: pro_easy_010
+    difficulty: easy
+    question: 查询不同供应商的数量
+    gold_sql: "SELECT COUNT(DISTINCT supplier) AS supplier_count FROM {procurement_table};"
+    tags: [count_distinct]
+
+  - id: pro_easy_011
+    difficulty: easy
+    question: 查询各物料类型的平均采购单价
+    gold_sql: >
+      SELECT material_type, AVG(unit_price) AS avg_price
+      FROM {procurement_table}
+      GROUP BY material_type;
+    tags: [group_by, avg]
+
+  - id: pro_easy_012
+    difficulty: easy
+    question: 查询3月份的总采购量（吨）
+    gold_sql: >
+      SELECT SUM(quantity) AS march_quantity
+      FROM {procurement_table}
+      WHERE order_month = '2026-03';
+    tags: [filter, sum]
+
+  - id: pro_easy_013
+    difficulty: easy
+    question: 查询交货已完成（status='completed'）的采购记录
+    gold_sql: >
+      SELECT * FROM {procurement_table}
+      WHERE status = 'completed';
+    tags: [filter, string]
+
+  - id: pro_easy_014
+    difficulty: easy
+    question: 查询各月份的采购记录数
+    gold_sql: >
+      SELECT order_month, COUNT(*) AS order_count
+      FROM {procurement_table}
+      GROUP BY order_month
+      ORDER BY order_month;
+    tags: [group_by, count]
+
+  - id: pro_easy_015
+    difficulty: easy
+    question: 查询最新月份的采购总金额
+    gold_sql: >
+      SELECT SUM(amount) AS latest_amount
+      FROM {procurement_table}
+      WHERE order_month = (SELECT MAX(order_month) FROM {procurement_table});
+    tags: [subquery, max]
+
+  # ============================================================
+  # Medium
+  # ============================================================
+
+  - id: pro_med_001
+    difficulty: medium
+    question: 查询各月份各物料类型的采购金额和采购量
+    gold_sql: >
+      SELECT order_month, material_type,
+             SUM(amount) AS total_amount,
+             SUM(quantity) AS total_quantity
+      FROM {procurement_table}
+      GROUP BY order_month, material_type
+      ORDER BY order_month, material_type;
+    tags: [group_by, multi_dim]
+
+  - id: pro_med_002
+    difficulty: medium
+    question: 计算各月采购金额环比变化
+    gold_sql: >
+      WITH monthly AS (
+          SELECT order_month, SUM(amount) AS amount
+          FROM {procurement_table}
+          GROUP BY order_month
+      )
+      SELECT order_month, amount,
+             amount - LAG(amount) OVER (ORDER BY order_month) AS mom_diff
+      FROM monthly
+      ORDER BY order_month;
+    tags: [cte, lag, mom]
+
+  - id: pro_med_003
+    difficulty: medium
+    question: 查询各供应商在第一季度的采购金额占比
+    gold_sql: >
+      WITH total AS (
+          SELECT SUM(amount) AS t FROM {procurement_table}
+          WHERE order_month BETWEEN '2026-01' AND '2026-03'
+      )
+      SELECT supplier, SUM(amount) AS amount,
+             ROUND(SUM(amount) / t * 100, 2) AS pct
+      FROM {procurement_table}, total
+      WHERE order_month BETWEEN '2026-01' AND '2026-03'
+      GROUP BY supplier, t
+      ORDER BY amount DESC;
+    tags: [cte, percentage, between]
+
+  - id: pro_med_004
+    difficulty: medium
+    question: 找出每月采购金额最高的供应商
+    gold_sql: >
+      SELECT DISTINCT ON (order_month)
+          order_month, supplier, SUM(amount) AS amount
+      FROM {procurement_table}
+      GROUP BY order_month, supplier
+      ORDER BY order_month, SUM(amount) DESC;
+    tags: [distinct_on, group_by]
+
+  - id: pro_med_005
+    difficulty: medium
+    question: 计算各物料的加权平均单价（按采购量加权）
+    gold_sql: >
+      SELECT material_name,
+             ROUND(SUM(amount) / NULLIF(SUM(quantity), 0), 2) AS weighted_avg_price
+      FROM {procurement_table}
+      GROUP BY material_name
+      ORDER BY weighted_avg_price DESC;
+    tags: [group_by, weighted_avg]
+
+  - id: pro_med_006
+    difficulty: medium
+    question: 查询各供应商的采购金额并标注是否为主要供应商（占比超过20%）
+    gold_sql: >
+      WITH total AS (SELECT SUM(amount) AS t FROM {procurement_table}),
+      sup AS (
+          SELECT supplier, SUM(amount) AS amount FROM {procurement_table}
+          GROUP BY supplier
+      )
+      SELECT s.supplier, s.amount,
+             ROUND(s.amount / t.t * 100, 2) AS share_pct,
+             CASE WHEN s.amount / t.t > 0.2 THEN '主要供应商' ELSE '一般供应商' END AS supplier_level
+      FROM sup s, total t
+      ORDER BY s.amount DESC;
+    tags: [cte, case_when, percentage]
+
+  - id: pro_med_007
+    difficulty: medium
+    question: 统计各供应商的采购次数和平均采购金额
+    gold_sql: >
+      SELECT supplier,
+             COUNT(*) AS order_count,
+             ROUND(AVG(amount), 2) AS avg_order_amount
+      FROM {procurement_table}
+      GROUP BY supplier
+      ORDER BY order_count DESC;
+    tags: [group_by, count, avg]
+
+  - id: pro_med_008
+    difficulty: medium
+    question: 查询第一季度采购金额超过月均的月份
+    gold_sql: >
+      SELECT order_month, SUM(amount) AS monthly_amount
+      FROM {procurement_table}
+      GROUP BY order_month
+      HAVING SUM(amount) > (
+          SELECT AVG(m) FROM (
+              SELECT SUM(amount) AS m FROM {procurement_table}
+              GROUP BY order_month
+          ) t
+      )
+      ORDER BY order_month;
+    tags: [having, subquery, avg]
+
+  - id: pro_med_009
+    difficulty: medium
+    question: 查询铁矿石和焦炭的各月采购量对比
+    gold_sql: >
+      SELECT order_month,
+             SUM(CASE WHEN material_name = '铁矿石' THEN quantity ELSE 0 END) AS iron_ore_qty,
+             SUM(CASE WHEN material_name = '焦炭'   THEN quantity ELSE 0 END) AS coke_qty
+      FROM {procurement_table}
+      GROUP BY order_month
+      ORDER BY order_month;
+    tags: [pivot, case_when, group_by]
+
+  - id: pro_med_010
+    difficulty: medium
+    question: 找出单次采购金额超过1000万元的大额采购记录及其供应商
+    gold_sql: >
+      SELECT order_month, supplier, material_name, amount
+      FROM {procurement_table}
+      WHERE amount > 1000
+      ORDER BY amount DESC;
+    tags: [filter, numeric]
+
+  # ============================================================
+  # Hard
+  # ============================================================
+
+  - id: pro_hard_001
+    difficulty: hard
+    question: 分析各供应商的采购集中度（赫芬达尔指数）
+    gold_sql: >
+      WITH total AS (SELECT SUM(amount) AS t FROM {procurement_table}),
+      sup AS (
+          SELECT supplier, SUM(amount) AS amount FROM {procurement_table}
+          GROUP BY supplier
+      )
+      SELECT ROUND(SUM(POWER(s.amount / t.t, 2)), 4) AS herfindahl_index
+      FROM sup s, total t;
+    tags: [herfindahl, power, concentration]
+
+  - id: pro_hard_002
+    difficulty: hard
+    question: 列出各月份采购量排名前2的物料及其采购量
+    gold_sql: >
+      SELECT order_month, material_name, total_qty
+      FROM (
+          SELECT order_month, material_name, SUM(quantity) AS total_qty,
+                 RANK() OVER (PARTITION BY order_month ORDER BY SUM(quantity) DESC) AS rk
+          FROM {procurement_table}
+          GROUP BY order_month, material_name
+      ) ranked
+      WHERE rk <= 2
+      ORDER BY order_month, rk;
+    tags: [window_function, rank, top_n]
+
+  - id: pro_hard_003
+    difficulty: hard
+    question: 计算各供应商的月均采购金额及其标准差
+    gold_sql: >
+      WITH monthly_sup AS (
+          SELECT supplier, order_month, SUM(amount) AS monthly_amount
+          FROM {procurement_table}
+          GROUP BY supplier, order_month
+      )
+      SELECT supplier,
+             ROUND(AVG(monthly_amount), 2) AS avg_monthly,
+             ROUND(STDDEV(monthly_amount), 2) AS stddev_monthly
+      FROM monthly_sup
+      GROUP BY supplier
+      ORDER BY avg_monthly DESC;
+    tags: [cte, stddev, avg]
+
+  - id: pro_hard_004
+    difficulty: hard
+    question: 对比各物料第一季度采购量与假设计划量（按实际的110%）的完成率
+    gold_sql: >
+      WITH actual AS (
+          SELECT material_name, SUM(quantity) AS actual_qty
+          FROM {procurement_table}
+          WHERE order_month BETWEEN '2026-01' AND '2026-03'
+          GROUP BY material_name
+      )
+      SELECT material_name,
+             actual_qty,
+             ROUND(actual_qty * 1.1, 0) AS planned_qty,
+             ROUND(actual_qty / (actual_qty * 1.1) * 100, 2) AS completion_pct
+      FROM actual
+      ORDER BY completion_pct DESC;
+    tags: [cte, calculated_field, completion_rate]
+
+  - id: pro_hard_005
+    difficulty: hard
+    question: 查找帕累托前20%的供应商（贡献80%采购额）
+    gold_sql: >
+      WITH sup_total AS (
+          SELECT supplier, SUM(amount) AS amount
+          FROM {procurement_table}
+          GROUP BY supplier
+      ),
+      total AS (SELECT SUM(amount) AS t FROM sup_total),
+      cumulative AS (
+          SELECT supplier, amount,
+                 SUM(amount) OVER (ORDER BY amount DESC) AS cum_amount,
+                 t
+          FROM sup_total, total
+      )
+      SELECT supplier, amount,
+             ROUND(cum_amount / t * 100, 2) AS cumulative_pct
+      FROM cumulative
+      WHERE cum_amount - amount < t * 0.8
+      ORDER BY amount DESC;
+    tags: [cte, cumulative, pareto, window_function]
+
+  - id: pro_hard_006
+    difficulty: hard
+    question: 计算各供应商采购金额的月环比增长率，并找出增速最稳定的（标准差最小）
+    gold_sql: >
+      WITH monthly AS (
+          SELECT supplier, order_month, SUM(amount) AS amount
+          FROM {procurement_table}
+          GROUP BY supplier, order_month
+      ),
+      growth AS (
+          SELECT supplier, order_month, amount,
+                 LAG(amount) OVER (PARTITION BY supplier ORDER BY order_month) AS prev_amount
+          FROM monthly
+      ),
+      growth_rate AS (
+          SELECT supplier,
+                 (amount - prev_amount) / NULLIF(prev_amount, 0) AS growth_pct
+          FROM growth
+          WHERE prev_amount IS NOT NULL
+      )
+      SELECT supplier, ROUND(STDDEV(growth_pct) * 100, 4) AS growth_stddev_pct
+      FROM growth_rate
+      GROUP BY supplier
+      ORDER BY growth_stddev_pct ASC
+      LIMIT 1;
+    tags: [cte, lag, stddev, stability]
+
+  - id: pro_hard_007
+    difficulty: hard
+    question: 用透视表展示各主要物料（铁矿石、焦炭）在每个月的采购金额
+    gold_sql: >
+      SELECT order_month,
+             SUM(CASE WHEN material_name = '铁矿石' THEN amount ELSE 0 END) AS iron_ore_amount,
+             SUM(CASE WHEN material_name = '焦炭'   THEN amount ELSE 0 END) AS coke_amount
+      FROM {procurement_table}
+      GROUP BY order_month
+      ORDER BY order_month;
+    tags: [pivot, case_when, group_by]
+
+  - id: pro_hard_008
+    difficulty: hard
+    question: 计算各物料类型采购金额的累计占比，找出覆盖70%采购额的物料类型
+    gold_sql: >
+      WITH type_total AS (
+          SELECT material_type, SUM(amount) AS amount
+          FROM {procurement_table}
+          GROUP BY material_type
+      ),
+      total AS (SELECT SUM(amount) AS t FROM type_total),
+      cumulative AS (
+          SELECT material_type, amount,
+                 SUM(amount) OVER (ORDER BY amount DESC) AS cum_amount,
+                 t
+          FROM type_total, total
+      )
+      SELECT material_type, amount,
+             ROUND(cum_amount / t * 100, 2) AS cumulative_pct
+      FROM cumulative
+      WHERE cum_amount - amount < t * 0.7
+      ORDER BY amount DESC;
+    tags: [cte, cumulative, window_function]
+
+  - id: pro_hard_009
+    difficulty: hard
+    question: 找出各供应商采购量与采购金额的相关性
+    gold_sql: >
+      SELECT supplier,
+             ROUND(CORR(quantity, amount)::NUMERIC, 4) AS corr_qty_amount
+      FROM {procurement_table}
+      GROUP BY supplier
+      HAVING COUNT(*) >= 2
+      ORDER BY corr_qty_amount DESC;
+    tags: [corr, statistical, group_by]
+
+  - id: pro_hard_010
+    difficulty: hard
+    question: 查询各月份各物料采购单价与上月均价对比（涨价/降价/持平）
+    gold_sql: >
+      WITH monthly_price AS (
+          SELECT order_month, material_name,
+                 ROUND(SUM(amount) / NULLIF(SUM(quantity), 0), 2) AS avg_price
+          FROM {procurement_table}
+          GROUP BY order_month, material_name
+      )
+      SELECT order_month, material_name, avg_price,
+             LAG(avg_price) OVER (PARTITION BY material_name ORDER BY order_month) AS prev_price,
+             CASE WHEN avg_price > LAG(avg_price) OVER (PARTITION BY material_name ORDER BY order_month) THEN '涨价'
+                  WHEN avg_price < LAG(avg_price) OVER (PARTITION BY material_name ORDER BY order_month) THEN '降价'
+                  ELSE '持平' END AS price_trend
+      FROM monthly_price
+      ORDER BY material_name, order_month;
+    tags: [cte, lag, case_when, price_trend]
+
+  # ============================================================
+  # 补充用例
+  # ============================================================
+
+  - id: pro_easy_016
+    difficulty: easy
+    question: 查询2026年2月的采购总金额
+    gold_sql: >
+      SELECT SUM(amount) AS feb_amount
+      FROM {procurement_table}
+      WHERE order_month = '2026-02';
+    tags: [filter, sum]
+
+  - id: pro_easy_017
+    difficulty: easy
+    question: 查询采购量超过10000吨的记录
+    gold_sql: >
+      SELECT * FROM {procurement_table}
+      WHERE quantity > 10000;
+    tags: [filter, numeric]
+
+  - id: pro_easy_018
+    difficulty: easy
+    question: 查询各物料名称出现的采购次数
+    gold_sql: >
+      SELECT material_name, COUNT(*) AS order_count
+      FROM {procurement_table}
+      GROUP BY material_name
+      ORDER BY order_count DESC;
+    tags: [group_by, count]
+
+  - id: pro_med_011
+    difficulty: medium
+    question: 查询第一季度采购金额占比超过30%的供应商
+    gold_sql: >
+      WITH total AS (
+          SELECT SUM(amount) AS t FROM {procurement_table}
+          WHERE order_month BETWEEN '2026-01' AND '2026-03'
+      )
+      SELECT supplier, SUM(amount) AS amount,
+             ROUND(SUM(amount) / t.t * 100, 2) AS share_pct
+      FROM {procurement_table}, total t
+      WHERE order_month BETWEEN '2026-01' AND '2026-03'
+      GROUP BY supplier, t.t
+      HAVING SUM(amount) / t.t > 0.3
+      ORDER BY amount DESC;
+    tags: [cte, having, percentage]
+
+  - id: pro_med_012
+    difficulty: medium
+    question: 统计各供应商的采购交货完成情况（completed vs pending 数量）
+    gold_sql: >
+      SELECT supplier,
+             COUNT(*) FILTER (WHERE status = 'completed') AS completed_count,
+             COUNT(*) FILTER (WHERE status = 'pending')   AS pending_count,
+             COUNT(*) AS total_count
+      FROM {procurement_table}
+      GROUP BY supplier
+      ORDER BY total_count DESC;
+    tags: [filter_aggregate, group_by, status_breakdown]

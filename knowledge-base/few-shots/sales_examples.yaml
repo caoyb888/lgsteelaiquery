@@ -1,0 +1,144 @@
+# ============================================================
+# 销售域 Few-shot 示例库（种子版 10 条）
+# ============================================================
+
+domain: sales
+version: "1.0"
+updated_at: "2026-03-27"
+
+examples:
+
+  - id: sal_001
+    difficulty: easy
+    question: "本月销售订单总数是多少？"
+    sql: |
+      SELECT COUNT(*) AS order_count
+      FROM sales_orders
+      WHERE order_date >= DATE_TRUNC('month', CURRENT_DATE)
+    expected_result_type: single_value
+    tags: [count, current_month]
+
+  - id: sal_002
+    difficulty: medium
+    question: "近三个月各客户的回款金额排名前10"
+    sql: |
+      SELECT customer_name,
+             SUM(payment_amount) AS total_payment
+      FROM sales_payment_records
+      WHERE payment_date >= CURRENT_DATE - INTERVAL '3 months'
+      GROUP BY customer_name
+      ORDER BY total_payment DESC
+      LIMIT 10
+    expected_result_type: table
+    tags: [ranking, payment, three_months]
+
+  - id: sal_003
+    difficulty: easy
+    question: "本月各产品线的销售量分别是多少？"
+    sql: |
+      SELECT product_line,
+             SUM(sales_volume) AS total_volume
+      FROM sales_orders
+      WHERE order_date >= DATE_TRUNC('month', CURRENT_DATE)
+      GROUP BY product_line
+      ORDER BY total_volume DESC
+    expected_result_type: bar_chart
+    tags: [groupby, volume, current_month]
+
+  - id: sal_004
+    difficulty: hard
+    question: "近6个月各月的销售收入趋势"
+    sql: |
+      SELECT TO_CHAR(DATE_TRUNC('month', order_date), 'YYYY-MM') AS month,
+             SUM(revenue) AS monthly_revenue
+      FROM sales_orders
+      WHERE order_date >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '5 months'
+      GROUP BY DATE_TRUNC('month', order_date)
+      ORDER BY month
+    expected_result_type: line_chart
+    tags: [trend, monthly, six_months]
+
+  - id: sal_005
+    difficulty: medium
+    question: "本月销售额最高的前5个客户"
+    sql: |
+      SELECT customer_name,
+             SUM(revenue) AS total_revenue
+      FROM sales_orders
+      WHERE order_date >= DATE_TRUNC('month', CURRENT_DATE)
+      GROUP BY customer_name
+      ORDER BY total_revenue DESC
+      LIMIT 5
+    expected_result_type: table
+    tags: [ranking, customer, current_month]
+
+  - id: sal_006
+    difficulty: easy
+    question: "本月总销售量是多少吨？"
+    sql: |
+      SELECT SUM(sales_volume) AS total_volume
+      FROM sales_orders
+      WHERE order_date >= DATE_TRUNC('month', CURRENT_DATE)
+    expected_result_type: single_value
+    tags: [aggregation, volume, current_month]
+
+  - id: sal_007
+    difficulty: medium
+    question: "各客户本月销售收入占比"
+    sql: |
+      SELECT customer_name,
+             SUM(revenue) AS customer_revenue,
+             ROUND(SUM(revenue) * 100.0 / SUM(SUM(revenue)) OVER (), 2) AS percentage
+      FROM sales_orders
+      WHERE order_date >= DATE_TRUNC('month', CURRENT_DATE)
+      GROUP BY customer_name
+      ORDER BY customer_revenue DESC
+      LIMIT 10
+    expected_result_type: pie_chart
+    tags: [percentage, customer, pie]
+
+  - id: sal_008
+    difficulty: hard
+    question: "本月回款率是多少（回款/开票金额）？"
+    sql: |
+      SELECT
+        SUM(p.payment_amount) AS total_payment,
+        SUM(o.revenue) AS total_invoiced,
+        ROUND(SUM(p.payment_amount) * 100.0 / NULLIF(SUM(o.revenue), 0), 2) AS payment_rate
+      FROM sales_orders o
+      LEFT JOIN sales_payment_records p
+        ON o.order_no = p.order_no
+        AND p.payment_date >= DATE_TRUNC('month', CURRENT_DATE)
+      WHERE o.order_date >= DATE_TRUNC('month', CURRENT_DATE)
+    expected_result_type: single_value
+    tags: [ratio, join, payment_rate]
+
+  - id: sal_009
+    difficulty: medium
+    question: "上个月各产品线的平均单价是多少？"
+    sql: |
+      SELECT product_line,
+             ROUND(AVG(unit_price), 2) AS avg_unit_price
+      FROM sales_orders
+      WHERE order_date >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month'
+        AND order_date <  DATE_TRUNC('month', CURRENT_DATE)
+        AND unit_price IS NOT NULL
+      GROUP BY product_line
+      ORDER BY avg_unit_price DESC
+    expected_result_type: table
+    tags: [average, unit_price, last_month]
+
+  - id: sal_010
+    difficulty: medium
+    question: "本季度新增客户数量是多少？"
+    sql: |
+      SELECT COUNT(DISTINCT customer_name) AS new_customer_count
+      FROM sales_orders
+      WHERE order_date >= DATE_TRUNC('quarter', CURRENT_DATE)
+        AND customer_name NOT IN (
+          SELECT DISTINCT customer_name
+          FROM sales_orders
+          WHERE order_date < DATE_TRUNC('quarter', CURRENT_DATE)
+        )
+    expected_result_type: single_value
+    tags: [count, new_customer, quarter]

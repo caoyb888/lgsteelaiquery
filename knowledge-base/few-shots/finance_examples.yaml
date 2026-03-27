@@ -1,0 +1,141 @@
+# ============================================================
+# 财务域 Few-shot 示例库（种子版 10 条，业务方后续持续补充）
+# ============================================================
+
+domain: finance
+version: "1.0"
+updated_at: "2026-03-27"
+
+examples:
+
+  - id: fin_001
+    difficulty: easy
+    question: "本月销售总收入是多少？"
+    sql: |
+      SELECT SUM(revenue) AS total_revenue
+      FROM finance_monthly_revenue
+      WHERE report_month >= DATE_TRUNC('month', CURRENT_DATE)
+        AND report_month <  DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
+    expected_result_type: single_value
+    tags: [aggregation, current_month]
+
+  - id: fin_002
+    difficulty: medium
+    question: "今年一季度各产品线的收入分别是多少？"
+    sql: |
+      SELECT product_line,
+             SUM(revenue) AS total_revenue
+      FROM finance_monthly_revenue
+      WHERE report_month >= DATE_TRUNC('year', CURRENT_DATE)
+        AND report_month <  DATE_TRUNC('year', CURRENT_DATE) + INTERVAL '3 months'
+      GROUP BY product_line
+      ORDER BY total_revenue DESC
+    expected_result_type: bar_chart
+    tags: [aggregation, groupby, quarter]
+
+  - id: fin_003
+    difficulty: hard
+    question: "对比去年同期，今年各月毛利率的变化趋势"
+    sql: |
+      SELECT TO_CHAR(report_month, 'YYYY-MM') AS month,
+             ROUND(SUM(gross_profit) * 100.0 / NULLIF(SUM(revenue), 0), 2) AS gross_profit_rate
+      FROM finance_monthly_revenue
+      WHERE EXTRACT(YEAR FROM report_month) IN (
+            EXTRACT(YEAR FROM CURRENT_DATE),
+            EXTRACT(YEAR FROM CURRENT_DATE) - 1
+      )
+      GROUP BY report_month
+      ORDER BY report_month
+    expected_result_type: line_chart
+    tags: [trend, yoy, gross_profit]
+
+  - id: fin_004
+    difficulty: medium
+    question: "应收账款超过90天未回款的客户有哪些？"
+    sql: |
+      SELECT customer_name,
+             SUM(receivable_amount) AS total_receivable
+      FROM finance_receivable
+      WHERE receivable_days > 90
+      GROUP BY customer_name
+      ORDER BY total_receivable DESC
+    expected_result_type: table
+    tags: [filter, receivable, risk]
+
+  - id: fin_005
+    difficulty: easy
+    question: "本月毛利润最高的前5个产品是什么？"
+    sql: |
+      SELECT product_name,
+             SUM(gross_profit) AS total_gross_profit
+      FROM finance_monthly_revenue
+      WHERE report_month >= DATE_TRUNC('month', CURRENT_DATE)
+      GROUP BY product_name
+      ORDER BY total_gross_profit DESC
+      LIMIT 5
+    expected_result_type: table
+    tags: [ranking, gross_profit, current_month]
+
+  - id: fin_006
+    difficulty: medium
+    question: "各产品线本月毛利率是多少，哪条产品线最高？"
+    sql: |
+      SELECT product_line,
+             ROUND(SUM(gross_profit) * 100.0 / NULLIF(SUM(revenue), 0), 2) AS gross_profit_rate
+      FROM finance_monthly_revenue
+      WHERE report_month >= DATE_TRUNC('month', CURRENT_DATE)
+      GROUP BY product_line
+      ORDER BY gross_profit_rate DESC
+    expected_result_type: bar_chart
+    tags: [groupby, gross_profit_rate, ranking]
+
+  - id: fin_007
+    difficulty: easy
+    question: "今年累计销售收入是多少？"
+    sql: |
+      SELECT SUM(revenue) AS ytd_revenue
+      FROM finance_monthly_revenue
+      WHERE EXTRACT(YEAR FROM report_month) = EXTRACT(YEAR FROM CURRENT_DATE)
+    expected_result_type: single_value
+    tags: [ytd, aggregation]
+
+  - id: fin_008
+    difficulty: medium
+    question: "近6个月的月度收入趋势如何？"
+    sql: |
+      SELECT TO_CHAR(report_month, 'YYYY-MM') AS month,
+             SUM(revenue) AS total_revenue
+      FROM finance_monthly_revenue
+      WHERE report_month >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '5 months'
+      GROUP BY report_month
+      ORDER BY report_month
+    expected_result_type: line_chart
+    tags: [trend, monthly, six_months]
+
+  - id: fin_009
+    difficulty: hard
+    question: "本月各产品线的收入占比分别是多少？"
+    sql: |
+      SELECT product_line,
+             SUM(revenue) AS line_revenue,
+             ROUND(SUM(revenue) * 100.0 / SUM(SUM(revenue)) OVER (), 2) AS percentage
+      FROM finance_monthly_revenue
+      WHERE report_month >= DATE_TRUNC('month', CURRENT_DATE)
+      GROUP BY product_line
+      ORDER BY line_revenue DESC
+    expected_result_type: pie_chart
+    tags: [percentage, window_function, pie]
+
+  - id: fin_010
+    difficulty: medium
+    question: "应收账款余额最大的前10个客户"
+    sql: |
+      SELECT customer_name,
+             SUM(receivable_amount) AS total_receivable
+      FROM finance_receivable
+      WHERE report_month = (SELECT MAX(report_month) FROM finance_receivable)
+      GROUP BY customer_name
+      ORDER BY total_receivable DESC
+      LIMIT 10
+    expected_result_type: table
+    tags: [ranking, receivable, top10]

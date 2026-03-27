@@ -1,0 +1,106 @@
+# ============================================================
+# 财务域 — 数据字典 Schema
+# 描述：财务部 Excel 台账的标准字段规范
+# ============================================================
+
+domain: finance
+display_name: 财务数据
+description: 财务部月度收入成本报表、利润表、应收账款明细等
+
+tables:
+
+  - table_key: finance_monthly_revenue
+    display_name: 月度收入成本报表
+    description: 每月各产品线的销售收入、成本、利润汇总
+    primary_keys: [report_month, product_line, product_name]
+    update_frequency: monthly
+    fields:
+      - std_name: report_month
+        display_name: 报告月份
+        field_type: date
+        required: true
+      - std_name: product_line
+        display_name: 产品线
+        field_type: text
+        required: true
+        example_values: [板材, 型钢, 线材, 管材]
+      - std_name: product_name
+        display_name: 产品名称
+        field_type: text
+        required: true
+        example_values: [热轧卷板, H型钢, 高线, 无缝钢管]
+      - std_name: revenue
+        display_name: 销售收入
+        field_type: float
+        unit: 万元
+        required: true
+      - std_name: cost
+        display_name: 生产成本
+        field_type: float
+        unit: 万元
+        required: true
+      - std_name: gross_profit
+        display_name: 毛利润
+        field_type: float
+        unit: 万元
+        required: false
+        derived: "revenue - cost"
+      - std_name: gross_profit_rate
+        display_name: 毛利率
+        field_type: float
+        unit: "%"
+        required: false
+        derived: "gross_profit / revenue * 100"
+      - std_name: sales_volume
+        display_name: 销售量
+        field_type: float
+        unit: 吨
+        required: true
+      - std_name: unit_price
+        display_name: 销售单价
+        field_type: float
+        unit: 元/吨
+        required: false
+        derived: "revenue * 10000 / sales_volume"
+
+  - table_key: finance_receivable
+    display_name: 应收账款明细
+    description: 客户应收账款余额与账龄分析
+    primary_keys: [customer_name, report_month]
+    update_frequency: monthly
+    fields:
+      - std_name: report_month
+        display_name: 报告月份
+        field_type: date
+        required: true
+      - std_name: customer_name
+        display_name: 客户名称
+        field_type: text
+        required: true
+      - std_name: customer_code
+        display_name: 客户编码
+        field_type: text
+        required: false
+      - std_name: receivable_amount
+        display_name: 应收账款余额
+        field_type: float
+        unit: 万元
+        required: true
+      - std_name: receivable_days
+        display_name: 账龄（天）
+        field_type: integer
+        unit: 天
+        required: false
+      - std_name: payment_received
+        display_name: 本月回款
+        field_type: float
+        unit: 万元
+        required: false
+
+join_keys:
+  - from_table: finance_monthly_revenue
+    to_table: finance_receivable
+    keys: [customer_name]
+  - from_table: finance_monthly_revenue
+    to_table: sales_orders
+    keys: [product_name, report_month]

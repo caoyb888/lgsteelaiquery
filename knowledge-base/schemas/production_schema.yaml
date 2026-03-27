@@ -1,0 +1,93 @@
+# ============================================================
+# 生产域 — 数据字典 Schema
+# ============================================================
+
+domain: production
+display_name: 生产数据
+description: 生产调度日报/月报、产量统计、质量指标汇总等
+
+tables:
+
+  - table_key: production_daily_report
+    display_name: 生产日报
+    description: 各工序、设备每日实际产量与计划对比
+    primary_keys: [report_date, process_name, equipment_name]
+    update_frequency: daily
+    fields:
+      - std_name: report_date
+        display_name: 日期
+        field_type: date
+        required: true
+      - std_name: process_name
+        display_name: 工序名称
+        field_type: text
+        required: true
+        example_values: [炼铁, 炼钢, 连铸, 热轧, 冷轧, 线材]
+      - std_name: equipment_name
+        display_name: 设备名称
+        field_type: text
+        required: false
+        example_values: [高炉一号, 高炉二号, 转炉一, 转炉二, 1580热连轧]
+      - std_name: daily_output
+        display_name: 实际产量
+        field_type: float
+        unit: 吨
+        required: true
+      - std_name: planned_output
+        display_name: 计划产量
+        field_type: float
+        unit: 吨
+        required: false
+      - std_name: completion_rate
+        display_name: 完成率
+        field_type: float
+        unit: "%"
+        required: false
+        derived: "daily_output / planned_output * 100"
+
+  - table_key: production_monthly_summary
+    display_name: 生产月报
+    description: 各工序月度产量汇总与质量指标
+    primary_keys: [report_month, process_name]
+    update_frequency: monthly
+    fields:
+      - std_name: report_month
+        display_name: 报告月份
+        field_type: date
+        required: true
+      - std_name: process_name
+        display_name: 工序名称
+        field_type: text
+        required: true
+      - std_name: product_name
+        display_name: 产品名称
+        field_type: text
+        required: false
+      - std_name: daily_output
+        display_name: 月产量
+        field_type: float
+        unit: 吨
+        required: true
+        description: 此处字段复用 daily_output 表示月累计产量
+      - std_name: planned_output
+        display_name: 月计划产量
+        field_type: float
+        unit: 吨
+        required: false
+      - std_name: yield_rate
+        display_name: 成品率
+        field_type: float
+        unit: "%"
+        required: false
+      - std_name: quality_grade
+        display_name: 质量等级
+        field_type: text
+        required: false
+
+join_keys:
+  - from_table: production_daily_report
+    to_table: production_monthly_summary
+    keys: [process_name]
+  - from_table: production_monthly_summary
+    to_table: finance_monthly_revenue
+    keys: [product_name, report_month]

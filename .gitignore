@@ -1,0 +1,60 @@
+# ============================================================
+# 莱钢 AI 问数 — Git 忽略规则
+# ============================================================
+
+# ===== 环境变量（含密码，禁止提交）=====
+.env
+.env.*
+!.env.example
+
+# ===== SSL 证书 =====
+nginx/ssl/*.pem
+nginx/ssl/*.key
+nginx/ssl/*.crt
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+*.egg-info/
+dist/
+build/
+
+# ===== Node.js =====
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# ===== Docker =====
+# 不忽略 docker-compose.yml，但忽略本地覆盖文件
+docker-compose.override.yml
+
+# ===== IDE =====
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ===== 日志 =====
+*.log
+logs/
+
+# ===== Excel 上传目录（运行时生成，不入库）=====
+backend/app/files/
+
+# ===== 测试产物 =====
+.coverage
+htmlcov/
+backend/htmlcov/

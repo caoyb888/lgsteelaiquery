@@ -1,0 +1,152 @@
+# ============================================================
+# 生产域 Few-shot 示例库（种子版 10 条）
+# ============================================================
+
+domain: production
+version: "1.0"
+updated_at: "2026-03-27"
+
+examples:
+
+  - id: prod_001
+    difficulty: easy
+    question: "上周高炉日均产量是多少吨？"
+    sql: |
+      SELECT AVG(daily_output) AS avg_daily_output
+      FROM production_daily_report
+      WHERE report_date >= DATE_TRUNC('week', CURRENT_DATE) - INTERVAL '1 week'
+        AND report_date <  DATE_TRUNC('week', CURRENT_DATE)
+        AND process_name LIKE '%高炉%'
+    expected_result_type: single_value
+    tags: [average, last_week, blast_furnace]
+
+  - id: prod_002
+    difficulty: medium
+    question: "本月各工序的产量完成率是多少？"
+    sql: |
+      SELECT process_name,
+             SUM(daily_output)   AS actual_output,
+             SUM(planned_output) AS planned,
+             ROUND(SUM(daily_output) * 100.0 / NULLIF(SUM(planned_output), 0), 2) AS completion_rate
+      FROM production_monthly_summary
+      WHERE report_month = DATE_TRUNC('month', CURRENT_DATE)
+      GROUP BY process_name
+      ORDER BY completion_rate ASC
+    expected_result_type: table
+    tags: [completion_rate, process, current_month]
+
+  - id: prod_003
+    difficulty: easy
+    question: "今天各设备的实际产量是多少？"
+    sql: |
+      SELECT equipment_name,
+             SUM(daily_output) AS daily_total
+      FROM production_daily_report
+      WHERE report_date = CURRENT_DATE
+      GROUP BY equipment_name
+      ORDER BY daily_total DESC
+    expected_result_type: table
+    tags: [today, equipment, output]
+
+  - id: prod_004
+    difficulty: hard
+    question: "近30天产量低于计划指标的天次统计"
+    sql: |
+      SELECT process_name,
+             COUNT(*) AS below_plan_days,
+             MIN(daily_output - planned_output) AS max_deficit
+      FROM production_daily_report
+      WHERE report_date >= CURRENT_DATE - INTERVAL '30 days'
+        AND planned_output IS NOT NULL
+        AND daily_output < planned_output
+      GROUP BY process_name
+      ORDER BY below_plan_days DESC
+    expected_result_type: table
+    tags: [filter, below_plan, thirty_days]
+
+  - id: prod_005
+    difficulty: medium
+    question: "本月各产品线的月产量是多少？"
+    sql: |
+      SELECT product_name,
+             SUM(daily_output) AS monthly_output
+      FROM production_monthly_summary
+      WHERE report_month = DATE_TRUNC('month', CURRENT_DATE)
+      GROUP BY product_name
+      ORDER BY monthly_output DESC
+    expected_result_type: bar_chart
+    tags: [groupby, product, current_month]
+
+  - id: prod_006
+    difficulty: medium
+    question: "近6个月的月度总产量趋势"
+    sql: |
+      SELECT TO_CHAR(report_month, 'YYYY-MM') AS month,
+             SUM(daily_output) AS total_output
+      FROM production_monthly_summary
+      WHERE report_month >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '5 months'
+      GROUP BY report_month
+      ORDER BY report_month
+    expected_result_type: line_chart
+    tags: [trend, monthly, six_months]
+
+  - id: prod_007
+    difficulty: easy
+    question: "本月总产量是多少吨？"
+    sql: |
+      SELECT SUM(daily_output) AS total_output
+      FROM production_monthly_summary
+      WHERE report_month = DATE_TRUNC('month', CURRENT_DATE)
+    expected_result_type: single_value
+    tags: [aggregation, current_month]
+
+  - id: prod_008
+    difficulty: hard
+    question: "本月和上月的产量对比，各工序增减情况"
+    sql: |
+      SELECT cur.process_name,
+             cur.current_output,
+             prev.prev_output,
+             cur.current_output - prev.prev_output AS diff,
+             ROUND((cur.current_output - prev.prev_output) * 100.0
+                   / NULLIF(prev.prev_output, 0), 2) AS change_rate
+      FROM (
+        SELECT process_name, SUM(daily_output) AS current_output
+        FROM production_monthly_summary
+        WHERE report_month = DATE_TRUNC('month', CURRENT_DATE)
+        GROUP BY process_name
+      ) cur
+      JOIN (
+        SELECT process_name, SUM(daily_output) AS prev_output
+        FROM production_monthly_summary
+        WHERE report_month = DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month'
+        GROUP BY process_name
+      ) prev USING (process_name)
+      ORDER BY change_rate DESC
+    expected_result_type: table
+    tags: [mom, comparison, process]
+
+  - id: prod_009
+    difficulty: medium
+    question: "各工序成品率最低的是哪个工序？"
+    sql: |
+      SELECT process_name,
+             AVG(yield_rate) AS avg_yield_rate
+      FROM production_monthly_summary
+      WHERE report_month >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '2 months'
+        AND yield_rate IS NOT NULL
+      GROUP BY process_name
+      ORDER BY avg_yield_rate ASC
+      LIMIT 5
+    expected_result_type: table
+    tags: [yield_rate, ranking, process]
+
+  - id: prod_010
+    difficulty: easy
+    question: "昨天的总产量是多少？"
+    sql: |
+      SELECT SUM(daily_output) AS yesterday_output
+      FROM production_daily_report
+      WHERE report_date = CURRENT_DATE - INTERVAL '1 day'
+    expected_result_type: single_value
+    tags: [yesterday, aggregation]

@@ -1,0 +1,487 @@
+# 销售域 SQL 准确率测试用例
+domain: sales
+cases:
+
+  # ============================================================
+  # Easy
+  # ============================================================
+
+  - id: sal_easy_001
+    difficulty: easy
+    question: 查询所有销售记录
+    gold_sql: "SELECT * FROM {sales_table};"
+    tags: [select_all]
+
+  - id: sal_easy_002
+    difficulty: easy
+    question: 统计销售记录总数
+    gold_sql: "SELECT COUNT(*) AS total FROM {sales_table};"
+    tags: [count]
+
+  - id: sal_easy_003
+    difficulty: easy
+    question: 查询各月份的总销售收入
+    gold_sql: >
+      SELECT report_month, SUM(revenue) AS total_revenue
+      FROM {sales_table}
+      GROUP BY report_month
+      ORDER BY report_month;
+    tags: [group_by, sum]
+
+  - id: sal_easy_004
+    difficulty: easy
+    question: 查询各产品线的总销量
+    gold_sql: >
+      SELECT product_line, SUM(volume) AS total_volume
+      FROM {sales_table}
+      GROUP BY product_line
+      ORDER BY total_volume DESC;
+    tags: [group_by, sum]
+
+  - id: sal_easy_005
+    difficulty: easy
+    question: 查询2026年1月的所有销售记录
+    gold_sql: >
+      SELECT * FROM {sales_table}
+      WHERE report_month = '2026-01';
+    tags: [filter, date]
+
+  - id: sal_easy_006
+    difficulty: easy
+    question: 查询板材的所有销售记录
+    gold_sql: >
+      SELECT * FROM {sales_table}
+      WHERE product_line = '板材';
+    tags: [filter, string]
+
+  - id: sal_easy_007
+    difficulty: easy
+    question: 按销售收入从高到低排列，取前5条
+    gold_sql: >
+      SELECT * FROM {sales_table}
+      ORDER BY revenue DESC
+      LIMIT 5;
+    tags: [order_by, limit]
+
+  - id: sal_easy_008
+    difficulty: easy
+    question: 查询客户A的所有销售记录
+    gold_sql: >
+      SELECT * FROM {sales_table}
+      WHERE customer = '客户A';
+    tags: [filter, string]
+
+  - id: sal_easy_009
+    difficulty: easy
+    question: 计算总销售额
+    gold_sql: "SELECT SUM(revenue) AS total_revenue FROM {sales_table};"
+    tags: [sum]
+
+  - id: sal_easy_010
+    difficulty: easy
+    question: 查询各客户的总销售额
+    gold_sql: >
+      SELECT customer, SUM(revenue) AS total_revenue
+      FROM {sales_table}
+      GROUP BY customer
+      ORDER BY total_revenue DESC;
+    tags: [group_by, sum]
+
+  - id: sal_easy_011
+    difficulty: easy
+    question: 查询销售量超过8000吨的记录
+    gold_sql: >
+      SELECT * FROM {sales_table}
+      WHERE volume > 8000;
+    tags: [filter, numeric]
+
+  - id: sal_easy_012
+    difficulty: easy
+    question: 查询热轧卷板的销售记录
+    gold_sql: >
+      SELECT * FROM {sales_table}
+      WHERE product_name = '热轧卷板';
+    tags: [filter, string]
+
+  - id: sal_easy_013
+    difficulty: easy
+    question: 查询各产品名称的平均单价
+    gold_sql: >
+      SELECT product_name, AVG(unit_price) AS avg_price
+      FROM {sales_table}
+      GROUP BY product_name;
+    tags: [group_by, avg]
+
+  - id: sal_easy_014
+    difficulty: easy
+    question: 统计有多少个不同客户
+    gold_sql: "SELECT COUNT(DISTINCT customer) AS customer_count FROM {sales_table};"
+    tags: [count_distinct]
+
+  - id: sal_easy_015
+    difficulty: easy
+    question: 查询最新月份的销售总额
+    gold_sql: >
+      SELECT SUM(revenue) AS latest_revenue
+      FROM {sales_table}
+      WHERE report_month = (SELECT MAX(report_month) FROM {sales_table});
+    tags: [subquery, max]
+
+  # ============================================================
+  # Medium
+  # ============================================================
+
+  - id: sal_med_001
+    difficulty: medium
+    question: 查询各月份各产品线的销售收入和销量
+    gold_sql: >
+      SELECT report_month, product_line,
+             SUM(revenue) AS revenue, SUM(volume) AS volume
+      FROM {sales_table}
+      GROUP BY report_month, product_line
+      ORDER BY report_month, product_line;
+    tags: [group_by, multi_dim]
+
+  - id: sal_med_002
+    difficulty: medium
+    question: 计算各月份的平均单价（按销量加权）
+    gold_sql: >
+      SELECT report_month,
+             ROUND(SUM(revenue * 10000) / NULLIF(SUM(volume), 0), 2) AS weighted_avg_price
+      FROM {sales_table}
+      GROUP BY report_month
+      ORDER BY report_month;
+    tags: [group_by, weighted_avg]
+    notes: "revenue 单位万元，volume 单位吨，unit_price 单位元/吨"
+
+  - id: sal_med_003
+    difficulty: medium
+    question: 查询第一季度各产品线收入占比
+    gold_sql: >
+      WITH total AS (
+          SELECT SUM(revenue) AS total_rev FROM {sales_table}
+          WHERE report_month BETWEEN '2026-01' AND '2026-03'
+      )
+      SELECT product_line,
+             SUM(revenue) AS revenue,
+             ROUND(SUM(revenue) / t.total_rev * 100, 2) AS pct
+      FROM {sales_table}, total t
+      WHERE report_month BETWEEN '2026-01' AND '2026-03'
+      GROUP BY product_line, t.total_rev
+      ORDER BY revenue DESC;
+    tags: [cte, percentage, group_by]
+
+  - id: sal_med_004
+    difficulty: medium
+    question: 查询每月销售额环比增长情况
+    gold_sql: >
+      WITH monthly AS (
+          SELECT report_month, SUM(revenue) AS revenue
+          FROM {sales_table}
+          GROUP BY report_month
+      )
+      SELECT report_month, revenue,
+             revenue - LAG(revenue) OVER (ORDER BY report_month) AS mom_diff
+      FROM monthly
+      ORDER BY report_month;
+    tags: [cte, lag, mom]
+
+  - id: sal_med_005
+    difficulty: medium
+    question: 找出每月销售额最高的产品
+    gold_sql: >
+      SELECT DISTINCT ON (report_month)
+          report_month, product_name, SUM(revenue) AS revenue
+      FROM {sales_table}
+      GROUP BY report_month, product_name
+      ORDER BY report_month, SUM(revenue) DESC;
+    tags: [distinct_on, group_by]
+
+  - id: sal_med_006
+    difficulty: medium
+    question: 查询客户A和客户B各月的销售收入对比
+    gold_sql: >
+      SELECT report_month,
+             SUM(CASE WHEN customer = '客户A' THEN revenue ELSE 0 END) AS customer_a,
+             SUM(CASE WHEN customer = '客户B' THEN revenue ELSE 0 END) AS customer_b
+      FROM {sales_table}
+      GROUP BY report_month
+      ORDER BY report_month;
+    tags: [pivot, case_when, group_by]
+
+  - id: sal_med_007
+    difficulty: medium
+    question: 计算各产品名称的收入和销量，并标注单价高低（高于均价标注"高"）
+    gold_sql: >
+      WITH avg_price AS (
+          SELECT AVG(unit_price) AS avg_p FROM {sales_table}
+      )
+      SELECT product_name, SUM(revenue) AS revenue, SUM(volume) AS volume,
+             AVG(unit_price) AS avg_unit_price,
+             CASE WHEN AVG(unit_price) > a.avg_p THEN '高' ELSE '低' END AS price_level
+      FROM {sales_table}, avg_price a
+      GROUP BY product_name, a.avg_p;
+    tags: [cte, case_when, avg]
+
+  - id: sal_med_008
+    difficulty: medium
+    question: 查询采购量连续3个月增长的产品线
+    gold_sql: >
+      WITH monthly AS (
+          SELECT report_month, product_line, SUM(volume) AS volume
+          FROM {sales_table}
+          GROUP BY report_month, product_line
+      ),
+      with_lag AS (
+          SELECT *,
+                 LAG(volume, 1) OVER (PARTITION BY product_line ORDER BY report_month) AS v1,
+                 LAG(volume, 2) OVER (PARTITION BY product_line ORDER BY report_month) AS v2
+          FROM monthly
+      )
+      SELECT DISTINCT product_line
+      FROM with_lag
+      WHERE volume > v1 AND v1 > v2;
+    tags: [cte, lag, consecutive_growth]
+
+  - id: sal_med_009
+    difficulty: medium
+    question: 计算各客户的第一季度采购额并按降序排列
+    gold_sql: >
+      SELECT customer, SUM(revenue) AS q1_revenue
+      FROM {sales_table}
+      WHERE report_month BETWEEN '2026-01' AND '2026-03'
+      GROUP BY customer
+      ORDER BY q1_revenue DESC;
+    tags: [filter, group_by, order_by]
+
+  - id: sal_med_010
+    difficulty: medium
+    question: 查询销售额超过行平均值的记录
+    gold_sql: >
+      SELECT * FROM {sales_table}
+      WHERE revenue > (SELECT AVG(revenue) FROM {sales_table});
+    tags: [subquery, filter, avg]
+
+  # ============================================================
+  # Hard
+  # ============================================================
+
+  - id: sal_hard_001
+    difficulty: hard
+    question: 计算各产品线的市场份额及排名（按第一季度总收入）
+    gold_sql: >
+      WITH q1_rev AS (
+          SELECT product_line, SUM(revenue) AS revenue
+          FROM {sales_table}
+          WHERE report_month BETWEEN '2026-01' AND '2026-03'
+          GROUP BY product_line
+      ),
+      total AS (SELECT SUM(revenue) AS t FROM q1_rev)
+      SELECT product_line, revenue,
+             ROUND(revenue / t * 100, 2) AS market_share_pct,
+             RANK() OVER (ORDER BY revenue DESC) AS revenue_rank
+      FROM q1_rev, total
+      ORDER BY revenue_rank;
+    tags: [cte, window_function, market_share]
+
+  - id: sal_hard_002
+    difficulty: hard
+    question: 找出购买产品种类最多的客户
+    gold_sql: >
+      SELECT customer, COUNT(DISTINCT product_name) AS product_variety
+      FROM {sales_table}
+      GROUP BY customer
+      ORDER BY product_variety DESC
+      LIMIT 1;
+    tags: [count_distinct, group_by, top_n]
+
+  - id: sal_hard_003
+    difficulty: hard
+    question: 按月统计销售收入的环比增长率，并标注增长/下降
+    gold_sql: >
+      WITH monthly AS (
+          SELECT report_month, SUM(revenue) AS revenue
+          FROM {sales_table}
+          GROUP BY report_month
+      )
+      SELECT report_month, revenue,
+             ROUND((revenue - LAG(revenue) OVER (ORDER BY report_month))
+                   / NULLIF(LAG(revenue) OVER (ORDER BY report_month), 0) * 100, 2) AS mom_pct,
+             CASE WHEN revenue > LAG(revenue) OVER (ORDER BY report_month) THEN '增长'
+                  WHEN revenue < LAG(revenue) OVER (ORDER BY report_month) THEN '下降'
+                  ELSE '持平' END AS trend
+      FROM monthly
+      ORDER BY report_month;
+    tags: [cte, window_function, lag, case_when, mom]
+
+  - id: sal_hard_004
+    difficulty: hard
+    question: 列出各客户每月的销售额以及该客户的历史累计销售额
+    gold_sql: >
+      SELECT customer, report_month,
+             SUM(revenue) AS monthly_revenue,
+             SUM(SUM(revenue)) OVER (
+                 PARTITION BY customer ORDER BY report_month
+             ) AS cumulative_revenue
+      FROM {sales_table}
+      GROUP BY customer, report_month
+      ORDER BY customer, report_month;
+    tags: [window_function, cumulative, partition_by]
+
+  - id: sal_hard_005
+    difficulty: hard
+    question: 找出第一季度增长最快（收入环比增速最高）的客户
+    gold_sql: >
+      WITH monthly AS (
+          SELECT customer, report_month, SUM(revenue) AS revenue
+          FROM {sales_table}
+          GROUP BY customer, report_month
+      ),
+      growth AS (
+          SELECT customer, report_month, revenue,
+                 LAG(revenue) OVER (PARTITION BY customer ORDER BY report_month) AS prev_rev
+          FROM monthly
+      )
+      SELECT customer,
+             ROUND(MAX((revenue - prev_rev) / NULLIF(prev_rev, 0)) * 100, 2) AS max_growth_pct
+      FROM growth
+      WHERE prev_rev IS NOT NULL
+      GROUP BY customer
+      ORDER BY max_growth_pct DESC
+      LIMIT 1;
+    tags: [cte, lag, max_growth, top_1]
+
+  - id: sal_hard_006
+    difficulty: hard
+    question: 查询各产品线在每个月的销量占当月总销量的百分比
+    gold_sql: >
+      SELECT report_month, product_line, SUM(volume) AS volume,
+             ROUND(
+                 SUM(volume) * 100.0 / SUM(SUM(volume)) OVER (PARTITION BY report_month),
+                 2
+             ) AS volume_share_pct
+      FROM {sales_table}
+      GROUP BY report_month, product_line
+      ORDER BY report_month, volume_share_pct DESC;
+    tags: [window_function, partition_by, percentage]
+
+  - id: sal_hard_007
+    difficulty: hard
+    question: 用透视表展示各产品线在1月、2月、3月的收入
+    gold_sql: >
+      SELECT product_line,
+             SUM(CASE WHEN report_month = '2026-01' THEN revenue ELSE 0 END) AS jan_revenue,
+             SUM(CASE WHEN report_month = '2026-02' THEN revenue ELSE 0 END) AS feb_revenue,
+             SUM(CASE WHEN report_month = '2026-03' THEN revenue ELSE 0 END) AS mar_revenue
+      FROM {sales_table}
+      GROUP BY product_line
+      ORDER BY product_line;
+    tags: [pivot, case_when, group_by]
+
+  - id: sal_hard_008
+    difficulty: hard
+    question: 找出贡献了80%销售额的客户（帕累托分析）
+    gold_sql: >
+      WITH customer_rev AS (
+          SELECT customer, SUM(revenue) AS revenue
+          FROM {sales_table}
+          GROUP BY customer
+      ),
+      total AS (SELECT SUM(revenue) AS t FROM customer_rev),
+      cumulative AS (
+          SELECT customer, revenue,
+                 SUM(revenue) OVER (ORDER BY revenue DESC) AS cum_revenue,
+                 t
+          FROM customer_rev, total
+      )
+      SELECT customer, revenue,
+             ROUND(cum_revenue / t * 100, 2) AS cumulative_share_pct
+      FROM cumulative
+      WHERE cum_revenue - revenue < t * 0.8
+      ORDER BY revenue DESC;
+    tags: [cte, cumulative, pareto, window_function]
+
+  - id: sal_hard_009
+    difficulty: hard
+    question: 计算各产品线的平均客单价及其在全产品线中的排名
+    gold_sql: >
+      WITH line_stats AS (
+          SELECT product_line,
+                 SUM(revenue) / NULLIF(COUNT(DISTINCT customer), 0) AS avg_customer_value
+          FROM {sales_table}
+          GROUP BY product_line
+      )
+      SELECT product_line, avg_customer_value,
+             RANK() OVER (ORDER BY avg_customer_value DESC) AS rk
+      FROM line_stats
+      ORDER BY rk;
+    tags: [cte, window_function, avg_per_customer]
+
+  - id: sal_hard_010
+    difficulty: hard
+    question: 查询在所有3个月都有销售记录的客户及其总销售额
+    gold_sql: >
+      SELECT customer, SUM(revenue) AS total_revenue
+      FROM {sales_table}
+      GROUP BY customer
+      HAVING COUNT(DISTINCT report_month) = (
+          SELECT COUNT(DISTINCT report_month) FROM {sales_table}
+      )
+      ORDER BY total_revenue DESC;
+    tags: [having, subquery, count_distinct]
+
+  # ============================================================
+  # 补充用例
+  # ============================================================
+
+  - id: sal_easy_016
+    difficulty: easy
+    question: 查询单价高于1400元/吨的销售记录
+    gold_sql: >
+      SELECT * FROM {sales_table}
+      WHERE unit_price > 1400;
+    tags: [filter, numeric]
+
+  - id: sal_easy_017
+    difficulty: easy
+    question: 查询3月份的总销量
+    gold_sql: >
+      SELECT SUM(volume) AS march_volume
+      FROM {sales_table}
+      WHERE report_month = '2026-03';
+    tags: [filter, sum]
+
+  - id: sal_easy_018
+    difficulty: easy
+    question: 查询型钢产品线的记录数
+    gold_sql: >
+      SELECT COUNT(*) AS count FROM {sales_table}
+      WHERE product_line = '型钢';
+    tags: [filter, count]
+
+  - id: sal_med_011
+    difficulty: medium
+    question: 对比板材和型钢各月的销售额
+    gold_sql: >
+      SELECT report_month,
+             SUM(CASE WHEN product_line = '板材' THEN revenue ELSE 0 END) AS 板材收入,
+             SUM(CASE WHEN product_line = '型钢' THEN revenue ELSE 0 END) AS 型钢收入
+      FROM {sales_table}
+      GROUP BY report_month
+      ORDER BY report_month;
+    tags: [pivot, case_when]
+
+  - id: sal_med_012
+    difficulty: medium
+    question: 查询各月份销量最高的前2个产品
+    gold_sql: >
+      SELECT report_month, product_name, volume
+      FROM (
+          SELECT report_month, product_name, SUM(volume) AS volume,
+                 RANK() OVER (PARTITION BY report_month ORDER BY SUM(volume) DESC) AS rk
+          FROM {sales_table}
+          GROUP BY report_month, product_name
+      ) ranked
+      WHERE rk <= 2
+      ORDER BY report_month, rk;
+    tags: [window_function, rank, top_n]

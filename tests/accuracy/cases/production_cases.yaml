@@ -1,0 +1,580 @@
+# 生产域 SQL 准确率测试用例
+domain: production
+cases:
+
+  # ============================================================
+  # Easy
+  # ============================================================
+
+  - id: prd_easy_001
+    difficulty: easy
+    question: 查询所有生产记录
+    gold_sql: "SELECT * FROM {production_table};"
+    tags: [select_all]
+
+  - id: prd_easy_002
+    difficulty: easy
+    question: 统计生产记录总数
+    gold_sql: "SELECT COUNT(*) AS total FROM {production_table};"
+    tags: [count]
+
+  - id: prd_easy_003
+    difficulty: easy
+    question: 查询各月份的总产量
+    gold_sql: >
+      SELECT report_month, SUM(output_volume) AS total_output
+      FROM {production_table}
+      GROUP BY report_month
+      ORDER BY report_month;
+    tags: [group_by, sum]
+
+  - id: prd_easy_004
+    difficulty: easy
+    question: 查询各产品线的总产量
+    gold_sql: >
+      SELECT product_line, SUM(output_volume) AS total_output
+      FROM {production_table}
+      GROUP BY product_line
+      ORDER BY total_output DESC;
+    tags: [group_by, sum]
+
+  - id: prd_easy_005
+    difficulty: easy
+    question: 查询2026年1月的生产数据
+    gold_sql: >
+      SELECT * FROM {production_table}
+      WHERE report_month = '2026-01';
+    tags: [filter, date]
+
+  - id: prd_easy_006
+    difficulty: easy
+    question: 查询热轧产线的生产记录
+    gold_sql: >
+      SELECT * FROM {production_table}
+      WHERE product_line = '热轧';
+    tags: [filter, string]
+
+  - id: prd_easy_007
+    difficulty: easy
+    question: 查询产量最高的前3条记录
+    gold_sql: >
+      SELECT * FROM {production_table}
+      ORDER BY output_volume DESC
+      LIMIT 3;
+    tags: [order_by, limit]
+
+  - id: prd_easy_008
+    difficulty: easy
+    question: 计算总产量
+    gold_sql: "SELECT SUM(output_volume) AS total_output FROM {production_table};"
+    tags: [sum]
+
+  - id: prd_easy_009
+    difficulty: easy
+    question: 查询合格率低于95%的生产记录
+    gold_sql: >
+      SELECT * FROM {production_table}
+      WHERE qualified_rate < 0.95;
+    tags: [filter, numeric]
+
+  - id: prd_easy_010
+    difficulty: easy
+    question: 查询各设备的平均产量
+    gold_sql: >
+      SELECT equipment_id, AVG(output_volume) AS avg_output
+      FROM {production_table}
+      GROUP BY equipment_id;
+    tags: [group_by, avg]
+
+  - id: prd_easy_011
+    difficulty: easy
+    question: 查询3月份各产品线的产量
+    gold_sql: >
+      SELECT product_line, SUM(output_volume) AS output
+      FROM {production_table}
+      WHERE report_month = '2026-03'
+      GROUP BY product_line;
+    tags: [filter, group_by]
+
+  - id: prd_easy_012
+    difficulty: easy
+    question: 查询产量超过5000吨的记录
+    gold_sql: >
+      SELECT * FROM {production_table}
+      WHERE output_volume > 5000;
+    tags: [filter, numeric]
+
+  - id: prd_easy_013
+    difficulty: easy
+    question: 计算各月份的平均合格率
+    gold_sql: >
+      SELECT report_month, AVG(qualified_rate) AS avg_qualified_rate
+      FROM {production_table}
+      GROUP BY report_month
+      ORDER BY report_month;
+    tags: [group_by, avg]
+
+  - id: prd_easy_014
+    difficulty: easy
+    question: 查询不同设备数量
+    gold_sql: "SELECT COUNT(DISTINCT equipment_id) AS equipment_count FROM {production_table};"
+    tags: [count_distinct]
+
+  - id: prd_easy_015
+    difficulty: easy
+    question: 查询最新月份的生产数据
+    gold_sql: >
+      SELECT * FROM {production_table}
+      WHERE report_month = (SELECT MAX(report_month) FROM {production_table});
+    tags: [subquery, max]
+
+  # ============================================================
+  # Medium
+  # ============================================================
+
+  - id: prd_med_001
+    difficulty: medium
+    question: 查询各月份各产品线的产量和合格率
+    gold_sql: >
+      SELECT report_month, product_line,
+             SUM(output_volume) AS output,
+             ROUND(AVG(qualified_rate) * 100, 2) AS avg_qualified_pct
+      FROM {production_table}
+      GROUP BY report_month, product_line
+      ORDER BY report_month, product_line;
+    tags: [group_by, multi_dim, avg]
+
+  - id: prd_med_002
+    difficulty: medium
+    question: 计算各月产量环比变化
+    gold_sql: >
+      WITH monthly AS (
+          SELECT report_month, SUM(output_volume) AS output
+          FROM {production_table}
+          GROUP BY report_month
+      )
+      SELECT report_month, output,
+             output - LAG(output) OVER (ORDER BY report_month) AS mom_diff
+      FROM monthly
+      ORDER BY report_month;
+    tags: [cte, lag, mom]
+
+  - id: prd_med_003
+    difficulty: medium
+    question: 查询合格率最低的产品线及其平均合格率
+    gold_sql: >
+      SELECT product_line, AVG(qualified_rate) AS avg_rate
+      FROM {production_table}
+      GROUP BY product_line
+      ORDER BY avg_rate ASC
+      LIMIT 1;
+    tags: [group_by, avg, order_by, limit]
+
+  - id: prd_med_004
+    difficulty: medium
+    question: 查询各设备每月的产量及占当月总产量的比例
+    gold_sql: >
+      SELECT report_month, equipment_id, SUM(output_volume) AS output,
+             ROUND(
+                 SUM(output_volume) * 100.0 / SUM(SUM(output_volume)) OVER (PARTITION BY report_month),
+                 2
+             ) AS output_share_pct
+      FROM {production_table}
+      GROUP BY report_month, equipment_id
+      ORDER BY report_month, output_share_pct DESC;
+    tags: [window_function, partition_by, percentage]
+
+  - id: prd_med_005
+    difficulty: medium
+    question: 找出每月产量最高的设备
+    gold_sql: >
+      SELECT DISTINCT ON (report_month)
+          report_month, equipment_id, SUM(output_volume) AS output
+      FROM {production_table}
+      GROUP BY report_month, equipment_id
+      ORDER BY report_month, SUM(output_volume) DESC;
+    tags: [distinct_on, group_by]
+
+  - id: prd_med_006
+    difficulty: medium
+    question: 查询合格品总量（产量×合格率）
+    gold_sql: >
+      SELECT report_month, product_line,
+             ROUND(SUM(output_volume * qualified_rate), 0) AS qualified_output
+      FROM {production_table}
+      GROUP BY report_month, product_line
+      ORDER BY report_month, product_line;
+    tags: [calculated_field, group_by]
+
+  - id: prd_med_007
+    difficulty: medium
+    question: 统计各产品线出现合格率低于95%的次数
+    gold_sql: >
+      SELECT product_line,
+             COUNT(*) FILTER (WHERE qualified_rate < 0.95) AS low_quality_count
+      FROM {production_table}
+      GROUP BY product_line;
+    tags: [filter_aggregate, count]
+
+  - id: prd_med_008
+    difficulty: medium
+    question: 查询第一季度产量高于同期平均产量的月份
+    gold_sql: >
+      SELECT report_month, SUM(output_volume) AS monthly_output
+      FROM {production_table}
+      GROUP BY report_month
+      HAVING SUM(output_volume) > (
+          SELECT AVG(monthly_total) FROM (
+              SELECT SUM(output_volume) AS monthly_total
+              FROM {production_table}
+              GROUP BY report_month
+          ) sub
+      )
+      ORDER BY report_month;
+    tags: [having, subquery, avg]
+
+  - id: prd_med_009
+    difficulty: medium
+    question: 按产品线统计第一季度的总产量并排名
+    gold_sql: >
+      SELECT product_line, SUM(output_volume) AS q1_output,
+             RANK() OVER (ORDER BY SUM(output_volume) DESC) AS rk
+      FROM {production_table}
+      WHERE report_month BETWEEN '2026-01' AND '2026-03'
+      GROUP BY product_line;
+    tags: [window_function, rank, between]
+
+  - id: prd_med_010
+    difficulty: medium
+    question: 查询产量连续增长的设备
+    gold_sql: >
+      WITH monthly AS (
+          SELECT report_month, equipment_id, SUM(output_volume) AS output
+          FROM {production_table}
+          GROUP BY report_month, equipment_id
+      ),
+      with_lag AS (
+          SELECT *,
+                 LAG(output) OVER (PARTITION BY equipment_id ORDER BY report_month) AS prev_output
+          FROM monthly
+      )
+      SELECT DISTINCT equipment_id
+      FROM with_lag
+      WHERE output > prev_output AND prev_output IS NOT NULL;
+    tags: [cte, lag, consecutive_growth]
+
+  # ============================================================
+  # Hard
+  # ============================================================
+
+  - id: prd_hard_001
+    difficulty: hard
+    question: 计算各产品线的第一季度产能利用率（假设设计产能为月均10000吨）
+    gold_sql: >
+      SELECT product_line,
+             SUM(output_volume) AS q1_output,
+             COUNT(DISTINCT report_month) * 10000 AS designed_capacity,
+             ROUND(SUM(output_volume) * 100.0 / (COUNT(DISTINCT report_month) * 10000), 2) AS utilization_pct
+      FROM {production_table}
+      WHERE report_month BETWEEN '2026-01' AND '2026-03'
+      GROUP BY product_line
+      ORDER BY utilization_pct DESC;
+    tags: [calculated_field, utilization_rate]
+
+  - id: prd_hard_002
+    difficulty: hard
+    question: 列出每月合格率最低的设备及其合格率
+    gold_sql: >
+      SELECT DISTINCT ON (report_month)
+          report_month, equipment_id, AVG(qualified_rate) AS avg_qualified_rate
+      FROM {production_table}
+      GROUP BY report_month, equipment_id
+      ORDER BY report_month, AVG(qualified_rate) ASC;
+    tags: [distinct_on, group_by, min_qualified]
+
+  - id: prd_hard_003
+    difficulty: hard
+    question: 计算各设备的产量趋势（线性回归斜率方向：上升/下降/平稳）
+    gold_sql: >
+      WITH monthly AS (
+          SELECT equipment_id, report_month,
+                 ROW_NUMBER() OVER (PARTITION BY equipment_id ORDER BY report_month) AS month_num,
+                 SUM(output_volume) AS output
+          FROM {production_table}
+          GROUP BY equipment_id, report_month
+      ),
+      regression AS (
+          SELECT equipment_id,
+                 REGR_SLOPE(output, month_num) AS slope
+          FROM monthly
+          GROUP BY equipment_id
+      )
+      SELECT equipment_id, slope,
+             CASE WHEN slope > 100  THEN '上升'
+                  WHEN slope < -100 THEN '下降'
+                  ELSE '平稳' END AS trend
+      FROM regression
+      ORDER BY slope DESC;
+    tags: [cte, regr_slope, trend_analysis]
+
+  - id: prd_hard_004
+    difficulty: hard
+    question: 查询各产品线连续达标（合格率≥95%）的最长连续月数
+    gold_sql: >
+      WITH monthly AS (
+          SELECT report_month, product_line,
+                 CASE WHEN AVG(qualified_rate) >= 0.95 THEN 1 ELSE 0 END AS is_qualified
+          FROM {production_table}
+          GROUP BY report_month, product_line
+      ),
+      groups AS (
+          SELECT *,
+                 ROW_NUMBER() OVER (PARTITION BY product_line ORDER BY report_month) -
+                 ROW_NUMBER() OVER (PARTITION BY product_line, is_qualified ORDER BY report_month) AS grp
+          FROM monthly
+      )
+      SELECT product_line, MAX(streak) AS max_consecutive_months
+      FROM (
+          SELECT product_line, grp, COUNT(*) AS streak
+          FROM groups
+          WHERE is_qualified = 1
+          GROUP BY product_line, grp
+      ) sub
+      GROUP BY product_line;
+    tags: [cte, gaps_islands, consecutive, max]
+
+  - id: prd_hard_005
+    difficulty: hard
+    question: 对比各产品线的产量与质量综合得分（产量权重60%，合格率权重40%）
+    gold_sql: >
+      WITH normalized AS (
+          SELECT product_line,
+                 SUM(output_volume) AS total_output,
+                 AVG(qualified_rate) AS avg_rate,
+                 MAX(SUM(output_volume)) OVER () AS max_output,
+                 MIN(SUM(output_volume)) OVER () AS min_output
+          FROM {production_table}
+          GROUP BY product_line
+      )
+      SELECT product_line, total_output, avg_rate,
+             ROUND(
+                 (total_output - min_output) / NULLIF(max_output - min_output, 0) * 0.6
+                 + avg_rate * 0.4,
+                 4
+             ) AS composite_score
+      FROM normalized
+      ORDER BY composite_score DESC;
+    tags: [cte, normalization, composite_score, window_function]
+
+  - id: prd_hard_006
+    difficulty: hard
+    question: 统计各设备在第一季度的停工天数估计（产量为0的月份×30天）
+    gold_sql: >
+      WITH all_months AS (
+          SELECT DISTINCT report_month FROM {production_table}
+      ),
+      all_equip AS (
+          SELECT DISTINCT equipment_id FROM {production_table}
+      ),
+      cross_join AS (
+          SELECT a.report_month, e.equipment_id
+          FROM all_months a CROSS JOIN all_equip e
+      ),
+      actual AS (
+          SELECT report_month, equipment_id, SUM(output_volume) AS output
+          FROM {production_table}
+          GROUP BY report_month, equipment_id
+      )
+      SELECT c.equipment_id,
+             COUNT(*) FILTER (WHERE COALESCE(a.output, 0) = 0) * 30 AS estimated_downtime_days
+      FROM cross_join c
+      LEFT JOIN actual a ON c.report_month = a.report_month AND c.equipment_id = a.equipment_id
+      GROUP BY c.equipment_id
+      ORDER BY estimated_downtime_days DESC;
+    tags: [cross_join, left_join, coalesce, downtime_estimation]
+
+  - id: prd_hard_007
+    difficulty: hard
+    question: 计算各产品线产量的季节性指数（月实际/月均）
+    gold_sql: >
+      WITH monthly AS (
+          SELECT report_month, product_line, SUM(output_volume) AS output
+          FROM {production_table}
+          GROUP BY report_month, product_line
+      ),
+      avg_output AS (
+          SELECT product_line, AVG(output) AS avg_monthly
+          FROM monthly
+          GROUP BY product_line
+      )
+      SELECT m.report_month, m.product_line, m.output,
+             ROUND(m.output / NULLIF(a.avg_monthly, 0), 4) AS seasonal_index
+      FROM monthly m
+      JOIN avg_output a ON m.product_line = a.product_line
+      ORDER BY m.product_line, m.report_month;
+    tags: [cte, seasonal_index, join]
+
+  - id: prd_hard_008
+    difficulty: hard
+    question: 列出产量月环比增长率排名前3的设备
+    gold_sql: >
+      WITH monthly AS (
+          SELECT equipment_id, report_month, SUM(output_volume) AS output
+          FROM {production_table}
+          GROUP BY equipment_id, report_month
+      ),
+      growth AS (
+          SELECT equipment_id, report_month, output,
+                 LAG(output) OVER (PARTITION BY equipment_id ORDER BY report_month) AS prev_output
+          FROM monthly
+      )
+      SELECT equipment_id,
+             ROUND(AVG((output - prev_output) / NULLIF(prev_output, 0)) * 100, 2) AS avg_growth_pct
+      FROM growth
+      WHERE prev_output IS NOT NULL
+      GROUP BY equipment_id
+      ORDER BY avg_growth_pct DESC
+      LIMIT 3;
+    tags: [cte, lag, avg_growth, top_n]
+
+  - id: prd_hard_009
+    difficulty: hard
+    question: 使用透视表展示各设备在1月、2月、3月的产量
+    gold_sql: >
+      SELECT equipment_id,
+             SUM(CASE WHEN report_month = '2026-01' THEN output_volume ELSE 0 END) AS jan_output,
+             SUM(CASE WHEN report_month = '2026-02' THEN output_volume ELSE 0 END) AS feb_output,
+             SUM(CASE WHEN report_month = '2026-03' THEN output_volume ELSE 0 END) AS mar_output
+      FROM {production_table}
+      GROUP BY equipment_id
+      ORDER BY equipment_id;
+    tags: [pivot, case_when, group_by]
+
+  - id: prd_hard_010
+    difficulty: hard
+    question: 找出连续两个月产量下降的产品线
+    gold_sql: >
+      WITH monthly AS (
+          SELECT report_month, product_line, SUM(output_volume) AS output
+          FROM {production_table}
+          GROUP BY report_month, product_line
+      ),
+      with_lag AS (
+          SELECT *,
+                 LAG(output, 1) OVER (PARTITION BY product_line ORDER BY report_month) AS v1,
+                 LAG(output, 2) OVER (PARTITION BY product_line ORDER BY report_month) AS v2
+          FROM monthly
+      )
+      SELECT DISTINCT product_line
+      FROM with_lag
+      WHERE output < v1 AND v1 < v2;
+    tags: [cte, lag, consecutive_decline]
+
+  # ============================================================
+  # 补充用例
+  # ============================================================
+
+  - id: prd_easy_016
+    difficulty: easy
+    question: 查询2026年2月的总产量
+    gold_sql: >
+      SELECT SUM(output_volume) AS feb_output
+      FROM {production_table}
+      WHERE report_month = '2026-02';
+    tags: [filter, sum]
+
+  - id: prd_easy_017
+    difficulty: easy
+    question: 查询合格率为100%的记录
+    gold_sql: >
+      SELECT * FROM {production_table}
+      WHERE qualified_rate = 1.0;
+    tags: [filter, exact_match]
+
+  - id: prd_med_011
+    difficulty: medium
+    question: 计算各产品线的不合格品总量
+    gold_sql: >
+      SELECT product_line,
+             ROUND(SUM(output_volume * (1 - qualified_rate)), 0) AS defective_volume
+      FROM {production_table}
+      GROUP BY product_line
+      ORDER BY defective_volume DESC;
+    tags: [calculated_field, group_by]
+
+  - id: prd_med_012
+    difficulty: medium
+    question: 查询各月份各产品线的不合格率（1-合格率）及排名
+    gold_sql: >
+      SELECT report_month, product_line,
+             ROUND((1 - AVG(qualified_rate)) * 100, 2) AS defect_rate_pct,
+             RANK() OVER (PARTITION BY report_month ORDER BY AVG(qualified_rate) ASC) AS defect_rank
+      FROM {production_table}
+      GROUP BY report_month, product_line
+      ORDER BY report_month, defect_rank;
+    tags: [window_function, rank, calculated_field]
+
+  - id: prd_easy_018
+    difficulty: easy
+    question: 查询各产品线的记录数
+    gold_sql: >
+      SELECT product_line, COUNT(*) AS record_count
+      FROM {production_table}
+      GROUP BY product_line
+      ORDER BY record_count DESC;
+    tags: [group_by, count]
+
+  - id: prd_easy_019
+    difficulty: easy
+    question: 查询产量最低的记录
+    gold_sql: >
+      SELECT * FROM {production_table}
+      ORDER BY output_volume ASC
+      LIMIT 1;
+    tags: [order_by, limit]
+
+  - id: prd_easy_020
+    difficulty: easy
+    question: 查询第一季度的总产量
+    gold_sql: >
+      SELECT SUM(output_volume) AS q1_output
+      FROM {production_table}
+      WHERE report_month BETWEEN '2026-01' AND '2026-03';
+    tags: [sum, between]
+
+  - id: prd_med_013
+    difficulty: medium
+    question: 统计各设备产量超过平均产量的月份数
+    gold_sql: >
+      WITH avg_output AS (
+          SELECT AVG(output_volume) AS avg_v FROM {production_table}
+      )
+      SELECT equipment_id,
+             COUNT(*) FILTER (WHERE output_volume > avg_v) AS above_avg_months
+      FROM {production_table}, avg_output
+      GROUP BY equipment_id
+      ORDER BY above_avg_months DESC;
+    tags: [filter_aggregate, subquery, avg]
+
+  - id: prd_hard_011
+    difficulty: hard
+    question: 计算各产品线每月产量的Z-score（标准化）
+    gold_sql: >
+      WITH monthly AS (
+          SELECT report_month, product_line, SUM(output_volume) AS output
+          FROM {production_table}
+          GROUP BY report_month, product_line
+      ),
+      stats AS (
+          SELECT product_line,
+                 AVG(output)    AS mean_output,
+                 STDDEV(output) AS std_output
+          FROM monthly
+          GROUP BY product_line
+      )
+      SELECT m.report_month, m.product_line, m.output,
+             ROUND((m.output - s.mean_output) / NULLIF(s.std_output, 0), 4) AS z_score
+      FROM monthly m
+      JOIN stats s ON m.product_line = s.product_line
+      ORDER BY m.product_line, m.report_month;
+    tags: [cte, zscore, normalization, join]

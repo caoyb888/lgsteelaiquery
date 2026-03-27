@@ -1,0 +1,49 @@
+# ============================================================
+# 莱钢 AI 问数 — 后端生产依赖
+# Python 3.11+
+# ============================================================
+
+# Web 框架
+fastapi==0.111.1
+uvicorn[standard]==0.30.6
+uvloop==0.19.0
+
+# 异步 HTTP 客户端（调用 LLM API）
+httpx==0.27.2
+
+# 数据库
+sqlalchemy==2.0.35
+asyncpg==0.29.0           # PostgreSQL async driver
+alembic==1.13.3
+
+# 缓存 / 任务队列
+redis==5.1.0
+celery==5.4.0
+flower==2.0.1              # Celery 监控（开发/运维用）
+
+# Excel 解析
+pandas==2.2.3
+openpyxl==3.1.5
+xlrd==2.0.1                # .xls 格式支持
+
+# 向量数据库
+chromadb==0.5.17
+
+# 配置管理
+pydantic==2.9.2
+pydantic-settings==2.5.2
+
+# 认证
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.12   # 文件上传
+
+# SQL 安全校验
+sqlglot==25.28.0
+
+# 日志
+loguru==0.7.2
+
+# 工具
+python-dateutil==2.9.0
+pytz==2024.2

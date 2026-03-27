@@ -1,0 +1,611 @@
+# 财务域 SQL 准确率测试用例
+# 表名使用占位符 {finance_table}，评估时替换为真实表名
+domain: finance
+cases:
+
+  # ============================================================
+  # Easy（简单聚合 / 单表 / 直接映射）
+  # ============================================================
+
+  - id: fin_easy_001
+    difficulty: easy
+    question: 查询所有财务记录
+    gold_sql: "SELECT * FROM {finance_table};"
+    tags: [select_all]
+
+  - id: fin_easy_002
+    difficulty: easy
+    question: 统计财务记录总数
+    gold_sql: "SELECT COUNT(*) AS total FROM {finance_table};"
+    tags: [count]
+
+  - id: fin_easy_003
+    difficulty: easy
+    question: 查询各月份的总收入
+    gold_sql: >
+      SELECT report_month, SUM(revenue) AS total_revenue
+      FROM {finance_table}
+      GROUP BY report_month
+      ORDER BY report_month;
+    tags: [group_by, sum]
+
+  - id: fin_easy_004
+    difficulty: easy
+    question: 查询各月份的总成本
+    gold_sql: >
+      SELECT report_month, SUM(cost) AS total_cost
+      FROM {finance_table}
+      GROUP BY report_month
+      ORDER BY report_month;
+    tags: [group_by, sum]
+
+  - id: fin_easy_005
+    difficulty: easy
+    question: 查询2026年1月的财务数据
+    gold_sql: >
+      SELECT * FROM {finance_table}
+      WHERE report_month = '2026-01';
+    tags: [filter, date]
+
+  - id: fin_easy_006
+    difficulty: easy
+    question: 按收入从高到低排列所有记录
+    gold_sql: >
+      SELECT * FROM {finance_table}
+      ORDER BY revenue DESC;
+    tags: [order_by]
+
+  - id: fin_easy_007
+    difficulty: easy
+    question: 查询收入最高的产品
+    gold_sql: >
+      SELECT product_name, revenue FROM {finance_table}
+      ORDER BY revenue DESC
+      LIMIT 1;
+    tags: [top_n, order_by]
+
+  - id: fin_easy_008
+    difficulty: easy
+    question: 查询总毛利润
+    gold_sql: "SELECT SUM(gross_profit) AS total_gross_profit FROM {finance_table};"
+    tags: [sum]
+
+  - id: fin_easy_009
+    difficulty: easy
+    question: 查询各产品的总收入
+    gold_sql: >
+      SELECT product_name, SUM(revenue) AS total_revenue
+      FROM {finance_table}
+      GROUP BY product_name
+      ORDER BY total_revenue DESC;
+    tags: [group_by, sum]
+
+  - id: fin_easy_010
+    difficulty: easy
+    question: 查询收入超过1000万元的记录
+    gold_sql: >
+      SELECT * FROM {finance_table}
+      WHERE revenue > 1000;
+    tags: [filter, numeric]
+
+  - id: fin_easy_011
+    difficulty: easy
+    question: 计算所有月份的平均收入
+    gold_sql: >
+      SELECT AVG(revenue) AS avg_revenue FROM {finance_table};
+    tags: [avg]
+
+  - id: fin_easy_012
+    difficulty: easy
+    question: 查询2026年第一季度各月的收入汇总
+    gold_sql: >
+      SELECT report_month, SUM(revenue) AS total_revenue
+      FROM {finance_table}
+      WHERE report_month IN ('2026-01', '2026-02', '2026-03')
+      GROUP BY report_month
+      ORDER BY report_month;
+    tags: [filter, group_by, date]
+
+  - id: fin_easy_013
+    difficulty: easy
+    question: 查询热轧卷板的所有财务记录
+    gold_sql: >
+      SELECT * FROM {finance_table}
+      WHERE product_name = '热轧卷板';
+    tags: [filter, string]
+
+  - id: fin_easy_014
+    difficulty: easy
+    question: 查询H型钢的总收入和总成本
+    gold_sql: >
+      SELECT SUM(revenue) AS total_revenue, SUM(cost) AS total_cost
+      FROM {finance_table}
+      WHERE product_name = 'H型钢';
+    tags: [filter, sum]
+
+  - id: fin_easy_015
+    difficulty: easy
+    question: 查询最新月份的财务数据
+    gold_sql: >
+      SELECT * FROM {finance_table}
+      WHERE report_month = (SELECT MAX(report_month) FROM {finance_table});
+    tags: [subquery, max]
+
+  # ============================================================
+  # Medium（多聚合 / 计算字段 / 子查询）
+  # ============================================================
+
+  - id: fin_med_001
+    difficulty: medium
+    question: 查询各月份的收入、成本和毛利润，并按月份排序
+    gold_sql: >
+      SELECT
+          report_month,
+          SUM(revenue) AS monthly_revenue,
+          SUM(cost) AS monthly_cost,
+          SUM(gross_profit) AS monthly_gross_profit
+      FROM {finance_table}
+      GROUP BY report_month
+      ORDER BY report_month;
+    tags: [group_by, multi_agg]
+
+  - id: fin_med_002
+    difficulty: medium
+    question: 计算各月份的毛利率（毛利润/收入）
+    gold_sql: >
+      SELECT
+          report_month,
+          SUM(gross_profit) / NULLIF(SUM(revenue), 0) AS gross_margin
+      FROM {finance_table}
+      GROUP BY report_month
+      ORDER BY report_month;
+    tags: [group_by, division, nullif]
+
+  - id: fin_med_003
+    difficulty: medium
+    question: 查询收入环比增长最大的月份
+    gold_sql: >
+      WITH monthly AS (
+          SELECT report_month, SUM(revenue) AS revenue
+          FROM {finance_table}
+          GROUP BY report_month
+      ),
+      growth AS (
+          SELECT report_month, revenue,
+                 LAG(revenue) OVER (ORDER BY report_month) AS prev_revenue
+          FROM monthly
+      )
+      SELECT report_month,
+             revenue - prev_revenue AS revenue_growth
+      FROM growth
+      WHERE prev_revenue IS NOT NULL
+      ORDER BY revenue_growth DESC
+      LIMIT 1;
+    tags: [cte, window_function, lag]
+
+  - id: fin_med_004
+    difficulty: medium
+    question: 查询各产品每月的收入占比
+    gold_sql: >
+      SELECT
+          report_month,
+          product_name,
+          revenue,
+          revenue / SUM(revenue) OVER (PARTITION BY report_month) AS revenue_share
+      FROM {finance_table}
+      ORDER BY report_month, revenue_share DESC;
+    tags: [window_function, partition_by]
+
+  - id: fin_med_005
+    difficulty: medium
+    question: 找出每个月毛利率最高的产品
+    gold_sql: >
+      WITH ranked AS (
+          SELECT
+              report_month,
+              product_name,
+              gross_profit / NULLIF(revenue, 0) AS margin,
+              RANK() OVER (PARTITION BY report_month ORDER BY gross_profit / NULLIF(revenue, 0) DESC) AS rk
+          FROM {finance_table}
+      )
+      SELECT report_month, product_name, margin
+      FROM ranked
+      WHERE rk = 1;
+    tags: [cte, window_function, rank]
+
+  - id: fin_med_006
+    difficulty: medium
+    question: 查询第一季度总收入、总成本和总毛利润
+    gold_sql: >
+      SELECT
+          SUM(revenue)      AS q1_revenue,
+          SUM(cost)         AS q1_cost,
+          SUM(gross_profit) AS q1_gross_profit
+      FROM {finance_table}
+      WHERE report_month BETWEEN '2026-01' AND '2026-03';
+    tags: [between, sum]
+
+  - id: fin_med_007
+    difficulty: medium
+    question: 对比热轧卷板和H型钢的季度收入
+    gold_sql: >
+      SELECT
+          product_name,
+          SUM(revenue) AS q1_revenue
+      FROM {finance_table}
+      WHERE product_name IN ('热轧卷板', 'H型钢')
+        AND report_month BETWEEN '2026-01' AND '2026-03'
+      GROUP BY product_name;
+    tags: [filter, in_clause, group_by]
+
+  - id: fin_med_008
+    difficulty: medium
+    question: 查询月均收入高于整体平均收入的月份
+    gold_sql: >
+      SELECT report_month, SUM(revenue) AS monthly_revenue
+      FROM {finance_table}
+      GROUP BY report_month
+      HAVING SUM(revenue) > (SELECT AVG(monthly_total) FROM (
+          SELECT SUM(revenue) AS monthly_total
+          FROM {finance_table}
+          GROUP BY report_month
+      ) sub);
+    tags: [having, subquery, avg]
+
+  - id: fin_med_009
+    difficulty: medium
+    question: 查询每种产品的最大收入月份
+    gold_sql: >
+      SELECT DISTINCT ON (product_name)
+          product_name, report_month, revenue
+      FROM {finance_table}
+      ORDER BY product_name, revenue DESC;
+    tags: [distinct_on, order_by]
+
+  - id: fin_med_010
+    difficulty: medium
+    question: 计算第一季度整体毛利率
+    gold_sql: >
+      SELECT
+          ROUND(SUM(gross_profit) / NULLIF(SUM(revenue), 0) * 100, 2) AS gross_margin_pct
+      FROM {finance_table}
+      WHERE report_month BETWEEN '2026-01' AND '2026-03';
+    tags: [round, division, between]
+
+  # ============================================================
+  # Hard（多层 CTE / 复杂窗口函数 / 同比/环比）
+  # ============================================================
+
+  - id: fin_hard_001
+    difficulty: hard
+    question: 按月份计算累计收入（截至当月的总收入）
+    gold_sql: >
+      SELECT
+          report_month,
+          SUM(revenue) AS monthly_revenue,
+          SUM(SUM(revenue)) OVER (ORDER BY report_month) AS cumulative_revenue
+      FROM {finance_table}
+      GROUP BY report_month
+      ORDER BY report_month;
+    tags: [window_function, cumulative, nested_agg]
+
+  - id: fin_hard_002
+    difficulty: hard
+    question: 查询每月各产品的收入排名
+    gold_sql: >
+      SELECT
+          report_month,
+          product_name,
+          revenue,
+          RANK() OVER (PARTITION BY report_month ORDER BY revenue DESC) AS revenue_rank
+      FROM {finance_table}
+      ORDER BY report_month, revenue_rank;
+    tags: [window_function, rank, partition_by]
+
+  - id: fin_hard_003
+    difficulty: hard
+    question: 计算各产品的收入月环比增长率
+    gold_sql: >
+      WITH monthly_revenue AS (
+          SELECT report_month, product_name, SUM(revenue) AS revenue
+          FROM {finance_table}
+          GROUP BY report_month, product_name
+      )
+      SELECT
+          curr.report_month,
+          curr.product_name,
+          curr.revenue,
+          prev.revenue AS prev_revenue,
+          ROUND(
+              (curr.revenue - prev.revenue) / NULLIF(prev.revenue, 0) * 100,
+              2
+          ) AS mom_growth_pct
+      FROM monthly_revenue curr
+      LEFT JOIN monthly_revenue prev
+          ON curr.product_name = prev.product_name
+         AND curr.report_month = TO_CHAR(
+                 (TO_DATE(prev.report_month, 'YYYY-MM') + INTERVAL '1 month'),
+                 'YYYY-MM'
+             )
+      ORDER BY curr.report_month, curr.product_name;
+    tags: [cte, self_join, date_arithmetic, mom]
+
+  - id: fin_hard_004
+    difficulty: hard
+    question: 找出收入增长连续两个月下滑的产品
+    gold_sql: >
+      WITH monthly AS (
+          SELECT report_month, product_name, SUM(revenue) AS revenue
+          FROM {finance_table}
+          GROUP BY report_month, product_name
+      ),
+      with_prev AS (
+          SELECT *,
+                 LAG(revenue, 1) OVER (PARTITION BY product_name ORDER BY report_month) AS rev_m1,
+                 LAG(revenue, 2) OVER (PARTITION BY product_name ORDER BY report_month) AS rev_m2
+          FROM monthly
+      )
+      SELECT DISTINCT product_name
+      FROM with_prev
+      WHERE revenue < rev_m1 AND rev_m1 < rev_m2;
+    tags: [cte, window_function, lag, consecutive]
+
+  - id: fin_hard_005
+    difficulty: hard
+    question: 汇总第一季度各产品的收入占总收入比例，并标注是否超过30%
+    gold_sql: >
+      WITH q1_total AS (
+          SELECT SUM(revenue) AS total FROM {finance_table}
+          WHERE report_month BETWEEN '2026-01' AND '2026-03'
+      ),
+      product_revenue AS (
+          SELECT product_name, SUM(revenue) AS revenue
+          FROM {finance_table}
+          WHERE report_month BETWEEN '2026-01' AND '2026-03'
+          GROUP BY product_name
+      )
+      SELECT
+          p.product_name,
+          p.revenue,
+          ROUND(p.revenue / t.total * 100, 2) AS share_pct,
+          CASE WHEN p.revenue / t.total > 0.3 THEN '是' ELSE '否' END AS exceeds_30pct
+      FROM product_revenue p, q1_total t
+      ORDER BY p.revenue DESC;
+    tags: [cte, case_when, cross_join, percentage]
+
+  - id: fin_hard_006
+    difficulty: hard
+    question: 计算各月份的盈亏平衡点（假设固定成本为月总成本的60%）
+    gold_sql: >
+      SELECT
+          report_month,
+          SUM(revenue) AS revenue,
+          SUM(cost) AS total_cost,
+          SUM(cost) * 0.6 AS fixed_cost,
+          ROUND(
+              SUM(cost) * 0.6 / NULLIF(1 - (SUM(cost) - SUM(cost) * 0.6) / NULLIF(SUM(revenue), 0), 0),
+              2
+          ) AS break_even_revenue
+      FROM {finance_table}
+      GROUP BY report_month
+      ORDER BY report_month;
+    tags: [formula, break_even, complex_calculation]
+
+  - id: fin_hard_007
+    difficulty: hard
+    question: 对比第一季度与假设的去年同期（revenue减少10%）的收入差异
+    gold_sql: >
+      WITH current_q1 AS (
+          SELECT product_name, SUM(revenue) AS current_revenue
+          FROM {finance_table}
+          WHERE report_month BETWEEN '2026-01' AND '2026-03'
+          GROUP BY product_name
+      )
+      SELECT
+          product_name,
+          current_revenue,
+          ROUND(current_revenue * 0.9, 2) AS yoy_baseline,
+          ROUND(current_revenue - current_revenue * 0.9, 2) AS yoy_diff,
+          ROUND((current_revenue - current_revenue * 0.9) / NULLIF(current_revenue * 0.9, 0) * 100, 2) AS yoy_growth_pct
+      FROM current_q1
+      ORDER BY product_name;
+    tags: [cte, yoy, calculation]
+
+  - id: fin_hard_008
+    difficulty: hard
+    question: 列出每月收入最高和最低的产品及其收入差值
+    gold_sql: >
+      WITH ranked AS (
+          SELECT report_month, product_name, revenue,
+                 ROW_NUMBER() OVER (PARTITION BY report_month ORDER BY revenue DESC) AS rn_max,
+                 ROW_NUMBER() OVER (PARTITION BY report_month ORDER BY revenue ASC)  AS rn_min
+          FROM {finance_table}
+      )
+      SELECT
+          m.report_month,
+          m.product_name AS max_product,
+          m.revenue      AS max_revenue,
+          n.product_name AS min_product,
+          n.revenue      AS min_revenue,
+          m.revenue - n.revenue AS revenue_diff
+      FROM ranked m
+      JOIN ranked n ON m.report_month = n.report_month AND n.rn_min = 1
+      WHERE m.rn_max = 1;
+    tags: [cte, row_number, self_join, max_min]
+
+  - id: fin_hard_009
+    difficulty: hard
+    question: 计算第一季度每个产品收入的移动平均（窗口为2个月）
+    gold_sql: >
+      SELECT
+          report_month,
+          product_name,
+          revenue,
+          AVG(revenue) OVER (
+              PARTITION BY product_name
+              ORDER BY report_month
+              ROWS BETWEEN 1 PRECEDING AND CURRENT ROW
+          ) AS moving_avg_2m
+      FROM {finance_table}
+      ORDER BY product_name, report_month;
+    tags: [window_function, moving_average, rows_between]
+
+  - id: fin_hard_010
+    difficulty: hard
+    question: 统计各产品连续盈利（毛利>0）的最长月份数
+    gold_sql: >
+      WITH profitable AS (
+          SELECT report_month, product_name,
+                 CASE WHEN gross_profit > 0 THEN 1 ELSE 0 END AS is_profitable
+          FROM {finance_table}
+      ),
+      groups AS (
+          SELECT *,
+                 ROW_NUMBER() OVER (PARTITION BY product_name ORDER BY report_month) -
+                 ROW_NUMBER() OVER (PARTITION BY product_name, is_profitable ORDER BY report_month) AS grp
+          FROM profitable
+      )
+      SELECT product_name, MAX(streak) AS max_consecutive_months
+      FROM (
+          SELECT product_name, grp, COUNT(*) AS streak
+          FROM groups
+          WHERE is_profitable = 1
+          GROUP BY product_name, grp
+      ) sub
+      GROUP BY product_name;
+    tags: [cte, gaps_islands, consecutive, max]
+
+  # ============================================================
+  # 补充用例（达到 ≥50 条）
+  # ============================================================
+
+  - id: fin_easy_016
+    difficulty: easy
+    question: 查询成本最高的月份
+    gold_sql: >
+      SELECT report_month, SUM(cost) AS total_cost
+      FROM {finance_table}
+      GROUP BY report_month
+      ORDER BY total_cost DESC
+      LIMIT 1;
+    tags: [group_by, order_by, limit]
+
+  - id: fin_easy_017
+    difficulty: easy
+    question: 查询毛利润为正的所有记录
+    gold_sql: >
+      SELECT * FROM {finance_table}
+      WHERE gross_profit > 0;
+    tags: [filter, numeric]
+
+  - id: fin_easy_018
+    difficulty: easy
+    question: 查询各产品出现的月份数
+    gold_sql: >
+      SELECT product_name, COUNT(DISTINCT report_month) AS month_count
+      FROM {finance_table}
+      GROUP BY product_name;
+    tags: [count_distinct]
+
+  - id: fin_easy_019
+    difficulty: easy
+    question: 按月份查询收入和成本的差额
+    gold_sql: >
+      SELECT report_month,
+             SUM(revenue) - SUM(cost) AS net_income
+      FROM {finance_table}
+      GROUP BY report_month
+      ORDER BY report_month;
+    tags: [group_by, arithmetic]
+
+  - id: fin_easy_020
+    difficulty: easy
+    question: 查询2026年2月H型钢的收入
+    gold_sql: >
+      SELECT revenue FROM {finance_table}
+      WHERE report_month = '2026-02' AND product_name = 'H型钢';
+    tags: [filter, multiple_conditions]
+
+  - id: fin_med_011
+    difficulty: medium
+    question: 查询第一季度收入超过各月均值的月份
+    gold_sql: >
+      SELECT report_month, SUM(revenue) AS monthly_revenue
+      FROM {finance_table}
+      GROUP BY report_month
+      HAVING SUM(revenue) > (
+          SELECT AVG(s) FROM (
+              SELECT SUM(revenue) AS s FROM {finance_table}
+              GROUP BY report_month
+          ) t
+      )
+      ORDER BY report_month;
+    tags: [having, subquery]
+
+  - id: fin_med_012
+    difficulty: medium
+    question: 查询毛利率高于15%的产品及月份
+    gold_sql: >
+      SELECT report_month, product_name,
+             ROUND(gross_profit / NULLIF(revenue, 0) * 100, 2) AS margin_pct
+      FROM {finance_table}
+      WHERE gross_profit / NULLIF(revenue, 0) > 0.15
+      ORDER BY margin_pct DESC;
+    tags: [filter, calculated_field]
+
+  - id: fin_med_013
+    difficulty: medium
+    question: 统计成本占收入比例超过85%的记录数
+    gold_sql: >
+      SELECT COUNT(*) AS high_cost_count
+      FROM {finance_table}
+      WHERE cost / NULLIF(revenue, 0) > 0.85;
+    tags: [filter, count, division]
+
+  - id: fin_med_014
+    difficulty: medium
+    question: 查询各产品的总收入和平均毛利率
+    gold_sql: >
+      SELECT
+          product_name,
+          SUM(revenue) AS total_revenue,
+          ROUND(AVG(gross_profit / NULLIF(revenue, 0)) * 100, 2) AS avg_margin_pct
+      FROM {finance_table}
+      GROUP BY product_name;
+    tags: [group_by, avg, calculated_field]
+
+  - id: fin_hard_011
+    difficulty: hard
+    question: 对每个产品按收入从高到低排名，显示名次、产品名和收入
+    gold_sql: >
+      SELECT
+          RANK() OVER (ORDER BY SUM(revenue) DESC) AS revenue_rank,
+          product_name,
+          SUM(revenue) AS total_revenue
+      FROM {finance_table}
+      GROUP BY product_name
+      ORDER BY revenue_rank;
+    tags: [window_function, rank, group_by]
+
+  - id: fin_hard_012
+    difficulty: hard
+    question: 找出第一季度各月收入增速最快的产品
+    gold_sql: >
+      WITH monthly AS (
+          SELECT report_month, product_name, SUM(revenue) AS revenue
+          FROM {finance_table}
+          GROUP BY report_month, product_name
+      ),
+      growth AS (
+          SELECT product_name, report_month, revenue,
+                 LAG(revenue) OVER (PARTITION BY product_name ORDER BY report_month) AS prev_rev
+          FROM monthly
+      )
+      SELECT DISTINCT ON (report_month)
+          report_month,
+          product_name,
+          ROUND((revenue - prev_rev) / NULLIF(prev_rev, 0) * 100, 2) AS growth_pct
+      FROM growth
+      WHERE prev_rev IS NOT NULL
+      ORDER BY report_month, growth_pct DESC;
+    tags: [cte, lag, distinct_on, growth_rate]

@@ -1,0 +1,527 @@
+# ============================================================
+# 莱钢集团 AI 问数 — 钢铁行业业务词汇映射表
+# 格式：每条记录对应一个标准字段，包含中文同义词列表
+# 用途：字段映射时的语义匹配基础词典
+# 更新：由数据维护员和业务方持续补充
+# ============================================================
+
+metadata:
+  version: "1.0"
+  domain: all
+  updated_at: "2026-03-27"
+  total_entries: 120
+
+entries:
+
+  # ================================================================
+  # 通用维度字段
+  # ================================================================
+
+  - std_name: report_month
+    display_name: 报告月份
+    domain: all
+    field_type: date
+    unit: ""
+    description: 报表所属月份，格式 YYYY-MM
+    synonyms:
+      - 月份
+      - 报告月
+      - 统计月份
+      - 所属月份
+      - 当月
+      - 本月
+      - 报表月
+      - 核算月份
+      - 会计月份
+
+  - std_name: report_date
+    display_name: 报告日期
+    domain: all
+    field_type: date
+    unit: ""
+    description: 报表所属日期，格式 YYYY-MM-DD
+    synonyms:
+      - 日期
+      - 报告日
+      - 统计日期
+      - 记录日期
+      - 日报日期
+
+  - std_name: report_year
+    display_name: 年份
+    domain: all
+    field_type: integer
+    unit: 年
+    description: 报表所属年份
+    synonyms:
+      - 年份
+      - 年度
+      - 财年
+      - 会计年度
+
+  - std_name: product_line
+    display_name: 产品线
+    domain: all
+    field_type: text
+    unit: ""
+    description: 产品大类分类，如板材、型钢、线材
+    synonyms:
+      - 产品线
+      - 产品大类
+      - 品类
+      - 产品类别
+      - 钢种大类
+      - 产品系列
+
+  - std_name: product_name
+    display_name: 产品名称
+    domain: all
+    field_type: text
+    unit: ""
+    description: 具体产品名称，如热轧卷板、H型钢
+    synonyms:
+      - 产品名称
+      - 产品名
+      - 品名
+      - 规格品名
+      - 钢材品名
+      - 品种
+
+  - std_name: product_code
+    display_name: 产品编码
+    domain: all
+    field_type: text
+    unit: ""
+    description: 产品唯一标识编码
+    synonyms:
+      - 产品编码
+      - 产品代码
+      - 物料编码
+      - 物料号
+      - 品号
+
+  # ================================================================
+  # 财务域字段
+  # ================================================================
+
+  - std_name: revenue
+    display_name: 销售收入
+    domain: finance
+    field_type: float
+    unit: 万元
+    description: 产品或业务的销售收入，默认单位万元
+    synonyms:
+      - 销售收入
+      - 收入
+      - 营收
+      - 销售额
+      - 营业收入
+      - 销售金额
+      - 实现收入
+      - 含税收入
+      - 不含税收入
+      - 营业额
+      - 产品收入
+
+  - std_name: cost
+    display_name: 成本
+    domain: finance
+    field_type: float
+    unit: 万元
+    description: 产品生产或业务运营成本
+    synonyms:
+      - 成本
+      - 生产成本
+      - 制造成本
+      - 销售成本
+      - 主营业务成本
+      - 产品成本
+      - 总成本
+
+  - std_name: gross_profit
+    display_name: 毛利润
+    domain: finance
+    field_type: float
+    unit: 万元
+    description: 收入减去成本后的毛利润
+    synonyms:
+      - 毛利润
+      - 毛利
+      - 毛利额
+      - 产品毛利
+
+  - std_name: gross_profit_rate
+    display_name: 毛利率
+    domain: finance
+    field_type: float
+    unit: "%"
+    description: 毛利润占收入的百分比
+    synonyms:
+      - 毛利率
+      - 毛利润率
+      - 毛利比率
+      - 产品毛利率
+
+  - std_name: net_profit
+    display_name: 净利润
+    domain: finance
+    field_type: float
+    unit: 万元
+    description: 扣除所有费用税收后的净利润
+    synonyms:
+      - 净利润
+      - 净利
+      - 净利润额
+      - 税后利润
+      - 利润总额
+
+  - std_name: payment_received
+    display_name: 回款金额
+    domain: finance
+    field_type: float
+    unit: 万元
+    description: 实际收到的货款金额
+    synonyms:
+      - 回款
+      - 回款金额
+      - 收款
+      - 实收金额
+      - 到账金额
+      - 收回货款
+      - 本月回款
+      - 实际回款
+
+  - std_name: receivable_amount
+    display_name: 应收账款
+    domain: finance
+    field_type: float
+    unit: 万元
+    description: 尚未收回的应收账款金额
+    synonyms:
+      - 应收账款
+      - 应收款
+      - 账款余额
+      - 未收款
+      - 待收款项
+
+  - std_name: receivable_days
+    display_name: 账龄（天）
+    domain: finance
+    field_type: integer
+    unit: 天
+    description: 应收账款未回款天数
+    synonyms:
+      - 账龄
+      - 未回款天数
+      - 逾期天数
+      - 拖欠天数
+      - 挂账天数
+
+  - std_name: unit_price
+    display_name: 单价
+    domain: finance
+    field_type: float
+    unit: 元/吨
+    description: 产品单位售价，默认元/吨
+    synonyms:
+      - 单价
+      - 销售单价
+      - 出厂价
+      - 结算单价
+      - 含税单价
+      - 不含税单价
+      - 吨价
+
+  # ================================================================
+  # 销售域字段
+  # ================================================================
+
+  - std_name: order_no
+    display_name: 订单号
+    domain: sales
+    field_type: text
+    unit: ""
+    description: 销售订单唯一编号
+    synonyms:
+      - 订单号
+      - 合同号
+      - 订单编号
+      - 合同编号
+      - 销售合同号
+
+  - std_name: customer_name
+    display_name: 客户名称
+    domain: sales
+    field_type: text
+    unit: ""
+    description: 购买方客户全称
+    synonyms:
+      - 客户名称
+      - 客户
+      - 购买方
+      - 买方
+      - 客户全称
+      - 用户名称
+
+  - std_name: customer_code
+    display_name: 客户编码
+    domain: sales
+    field_type: text
+    unit: ""
+    description: 客户唯一标识编码
+    synonyms:
+      - 客户编码
+      - 客户代码
+      - 用户编号
+
+  - std_name: sales_volume
+    display_name: 销售量
+    domain: sales
+    field_type: float
+    unit: 吨
+    description: 销售吨数
+    synonyms:
+      - 销售量
+      - 销量
+      - 销售数量
+      - 发货量
+      - 出货量
+      - 销售吨数
+      - 销售吨位
+      - 出库量
+
+  - std_name: order_date
+    display_name: 下单日期
+    domain: sales
+    field_type: date
+    unit: ""
+    description: 销售订单签订日期
+    synonyms:
+      - 下单日期
+      - 订单日期
+      - 合同日期
+      - 签约日期
+      - 订货日期
+
+  - std_name: delivery_date
+    display_name: 发货日期
+    domain: sales
+    field_type: date
+    unit: ""
+    description: 实际发货日期
+    synonyms:
+      - 发货日期
+      - 出货日期
+      - 出库日期
+      - 交货日期
+      - 实际发货日期
+
+  - std_name: payment_amount
+    display_name: 回款金额
+    domain: sales
+    field_type: float
+    unit: 万元
+    description: 销售回款金额
+    synonyms:
+      - 回款金额
+      - 回款
+      - 回款数
+      - 实收货款
+      - 收款金额
+
+  - std_name: payment_date
+    display_name: 回款日期
+    domain: sales
+    field_type: date
+    unit: ""
+    description: 货款到账日期
+    synonyms:
+      - 回款日期
+      - 收款日期
+      - 到账日期
+      - 付款日期
+
+  # ================================================================
+  # 生产域字段
+  # ================================================================
+
+  - std_name: daily_output
+    display_name: 日产量
+    domain: production
+    field_type: float
+    unit: 吨
+    description: 当日实际产量
+    synonyms:
+      - 日产量
+      - 当日产量
+      - 日产
+      - 实际产量
+      - 当日实际产量
+      - 日度产量
+
+  - std_name: planned_output
+    display_name: 计划产量
+    domain: production
+    field_type: float
+    unit: 吨
+    description: 计划生产量
+    synonyms:
+      - 计划产量
+      - 生产计划
+      - 计划量
+      - 任务量
+      - 生产任务
+
+  - std_name: process_name
+    display_name: 工序名称
+    domain: production
+    field_type: text
+    unit: ""
+    description: 生产工序名称，如炼铁、炼钢、轧钢
+    synonyms:
+      - 工序
+      - 工序名称
+      - 工段
+      - 生产工序
+      - 工艺段
+      - 产线
+
+  - std_name: equipment_name
+    display_name: 设备名称
+    domain: production
+    field_type: text
+    unit: ""
+    description: 生产设备名称，如高炉一号、转炉
+    synonyms:
+      - 设备名称
+      - 设备
+      - 设备编号
+      - 炉号
+      - 机台
+
+  - std_name: quality_grade
+    display_name: 质量等级
+    domain: production
+    field_type: text
+    unit: ""
+    description: 产品质量等级评定
+    synonyms:
+      - 质量等级
+      - 等级
+      - 品级
+      - 质量级别
+      - 产品等级
+
+  - std_name: yield_rate
+    display_name: 成品率
+    domain: production
+    field_type: float
+    unit: "%"
+    description: 合格品占总产量的百分比
+    synonyms:
+      - 成品率
+      - 合格率
+      - 良品率
+      - 产品合格率
+      - 直接合格率
+
+  - std_name: completion_rate
+    display_name: 完成率
+    domain: production
+    field_type: float
+    unit: "%"
+    description: 实际产量占计划产量的百分比
+    synonyms:
+      - 完成率
+      - 计划完成率
+      - 任务完成率
+      - 产量完成率
+      - 生产完成率
+
+  # ================================================================
+  # 采购域字段
+  # ================================================================
+
+  - std_name: material_name
+    display_name: 物料名称
+    domain: procurement
+    field_type: text
+    unit: ""
+    description: 采购物料名称，如焦炭、铁矿石
+    synonyms:
+      - 物料名称
+      - 原料名称
+      - 材料
+      - 物资
+      - 采购物料
+      - 物料品名
+      - 原材料
+
+  - std_name: supplier_name
+    display_name: 供应商名称
+    domain: procurement
+    field_type: text
+    unit: ""
+    description: 供货商全称
+    synonyms:
+      - 供应商
+      - 供应商名称
+      - 供货商
+      - 卖方
+      - 厂商
+      - 合作供应商
+
+  - std_name: purchase_quantity
+    display_name: 采购数量
+    domain: procurement
+    field_type: float
+    unit: 吨
+    description: 采购物料数量
+    synonyms:
+      - 采购数量
+      - 采购量
+      - 采购吨数
+      - 入库量
+      - 收货量
+      - 到货量
+
+  - std_name: purchase_amount
+    display_name: 采购金额
+    domain: procurement
+    field_type: float
+    unit: 万元
+    description: 采购合同金额
+    synonyms:
+      - 采购金额
+      - 采购额
+      - 采购合同金额
+      - 合同金额
+      - 采购价值
+      - 总金额
+      - 结算金额
+
+  - std_name: purchase_date
+    display_name: 采购日期
+    domain: procurement
+    field_type: date
+    unit: ""
+    description: 采购发生日期
+    synonyms:
+      - 采购日期
+      - 采购时间
+      - 下单日期
+      - 合同日期
+      - 入库日期
+
+  - std_name: total_amount
+    display_name: 合计金额
+    domain: procurement
+    field_type: float
+    unit: 万元
+    description: 采购合计金额
+    synonyms:
+      - 合计金额
+      - 总金额
+      - 金额合计
+      - 合计
+      - 小计
