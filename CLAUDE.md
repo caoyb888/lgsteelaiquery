@@ -1105,14 +1105,72 @@ EXCEL_UPLOAD_DIR=/app/files/excel
 
 ---
 
+---
+
+## 14. 首次部署已知问题清单（2026-03-27 实测）
+
+> 以下问题均在新服务器首次部署时实际触发并已修复，再次部署时需注意。
+
+### 14.1 依赖版本约束（requirements.txt）
+
+| 包 | 约束 | 原因 |
+|----|------|------|
+| `numpy` | `==1.26.4` | 服务器 CPU（Intel Core 2 Duo T7700）不支持 POPCNT 指令，numpy 2.x 要求 X86_V2 baseline，启动时 RuntimeError 崩溃 |
+| `bcrypt` | `==4.2.1` | passlib 1.7.4 与 bcrypt 5.x 不兼容，登录时密码验证报 AttributeError |
+| `chromadb` | `==0.5.17` | 必须与 docker-compose.yml 中的镜像版本一致（`chromadb/chroma:0.5.17`），版本不匹配会导致 KeyError `_type` |
+| `psycopg2-binary` | `==2.9.9` | Alembic env.py 使用同步驱动 `postgresql+psycopg2://`，容器中缺少此包则迁移命令报 ModuleNotFoundError |
+
+### 14.2 代码 Bug（已在代码库中修复，记录供参考）
+
+**datasource.py — 上传/确认流程**
+- `upload_datasource` 上传后必须同时写入 `FieldMapping` 记录，否则 confirm 时 `ds.field_mappings` 为空
+- `confirm_field_mappings` 查询 Datasource 时必须加 `selectinload(Datasource.field_mappings)`，否则 async 上下文 lazy load 报 `MissingGreenlet`
+- `upload_datasource` 函数签名需显式声明 `Form` 参数：`domain`、`data_date`、`update_mode`
+
+**worker.py — Celery 入库任务**
+- Celery forked worker 中**禁止复用模块级 `async_engine`**（与父进程事件循环绑定），必须在任务函数内部 `create_async_engine()`，用完 `await engine.dispose()`
+- `docker-compose.yml` 中 celery 启动命令必须加 `-Q celery,excel,embed`，否则路由到 `excel`/`embed` 队列的任务永远不被消费
+- `CleanResult` 的行数字段名为 `rows_written`（非 `loaded_rows`）
+- `ParsedField` 的清理后列名字段为 `clean_name`（非 `display_name`）
+- `DataDictionaryManager.__init__` 需要三个参数：`embedding_service`、`chroma_client`、`meta_session_factory`
+
+**admin.py**
+- SQLAlchemy `cast()` 参数必须用 `Integer` 类型（`from sqlalchemy import Integer`），不能传 Python 内置 `int`
+
+### 14.3 前端问题
+
+| 问题 | 修复方式 |
+|------|---------|
+| 登录密码错误无提示 | `request.ts` 响应拦截器对 `/auth/login` 的 401 不跳转，直接透传错误给调用方 |
+| 刷新页面后路由守卫将已登录用户踢到登录页 | 登录时将 `user_role`、`user_id`、`username`、`display_name` 全部持久化到 `localStorage` |
+| `el-table` 带 `fixed` 列时 `ElMessageBox.confirm` 弹窗不可见 | 固定列产生独立 stacking context，改用 `el-popconfirm`（内联气泡确认）即可 |
+
+### 14.4 前端缺失文件
+
+- `frontend/index.html` 未提交到仓库，Vite build 报 "Could not resolve entry module"，需手动创建
+
+### 14.5 Nginx 动态 DNS 解析
+
+```nginx
+# nginx.conf 必须配置，否则容器重建后 IP 变化导致 502
+resolver 127.0.0.11 valid=10s ipv6=off;
+location /api/ {
+    set $backend http://lgsteel_backend:8000;
+    proxy_pass $backend;
+}
+```
+
+---
+
 **版本变更记录**
 
 | 版本 | 日期 | 变更内容 |
 |-----|------|---------|
 | V1.0 | 2026-03-26 | 初始版本 |
-| V2.0 | 2026-03-26 | 新增第3章 Docker 多项目共存规范（端口分配表、命名规范、Compose模板、启动脚本、容器间通信约束、资源操作禁令）；数据层调整为 Excel 导入；新增双库 Session 规范；AI 提示词补充 Docker 约束 |
+| V2.0 | 2026-03-26 | 新增第3章 Docker 多项目共存规范；数据层调整为 Excel 导入；新增双库 Session 规范 |
+| V2.1 | 2026-03-27 | 新增第14章：首次部署已知问题清单（依赖版本约束、代码 Bug、前端问题、nginx 配置） |
 
 ---
 
 *本文件随项目演进持续更新，变更须经技术负责人审批后提交至主分支。*
-*最后更新：2026-03-26 | 版本：V2.0*
+*最后更新：2026-03-27 | 版本：V2.1*
