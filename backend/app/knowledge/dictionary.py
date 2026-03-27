@@ -29,7 +29,7 @@ _COLLECTION_FEW_SHOTS = "lgsteel_few_shots"
 # knowledge-base/schemas/ 相对项目根目录路径
 # 本文件位于 backend/app/knowledge/dictionary.py，
 # 项目根目录为 backend/app/knowledge/../../.. 即 lgsteel-ai-query/
-_PROJECT_ROOT = Path(__file__).resolve().parents[4]
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
 _SCHEMA_DIR = _PROJECT_ROOT / "knowledge-base" / "schemas"
 
 

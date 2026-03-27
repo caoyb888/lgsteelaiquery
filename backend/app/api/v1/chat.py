@@ -125,14 +125,23 @@ async def query(
     contextual_question = conv_manager.build_contextual_question(history, request.question)
 
     # 3. 语义检索相关 Schema（从知识库）
+    import chromadb as _chromadb
+    _settings = _get_settings()
     llm_client = get_llm_router()
     embed_service = EmbeddingService(redis_client=redis)
-    dict_manager = DataDictionaryManager(redis_client=redis, embedding_service=embed_service)
+    chroma_client = await _chromadb.AsyncHttpClient(
+        host=_settings.chroma_host, port=_settings.chroma_port
+    )
+    dict_manager = DataDictionaryManager(
+        embedding_service=embed_service,
+        chroma_client=chroma_client,
+        meta_session_factory=_MetaSessionFactory,
+    )
 
     # 默认取第一个有权限的域
     domain = list(allowed_domains)[0] if allowed_domains else "unknown"
     schema_context = await dict_manager.get_schema_context(
-        question=contextual_question,
+        query=contextual_question,
         domain=domain,
     )
 

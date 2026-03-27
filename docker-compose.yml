@@ -16,6 +16,18 @@ volumes:
 
 services:
 
+  frontend:
+    container_name: lgsteel_frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+    networks:
+      - lgsteel_net
+    restart: always
+    labels:
+      project: lgsteel
+
   nginx:
     container_name: lgsteel_nginx
     image: nginx:1.25-alpine
@@ -29,6 +41,7 @@ services:
       - lgsteel_net
     depends_on:
       - backend
+      - frontend
     restart: always
     labels:
       project: lgsteel
@@ -152,7 +165,7 @@ services:
 
   chromadb:
     container_name: lgsteel_chromadb
-    image: chromadb/chroma:latest
+    image: chromadb/chroma:0.5.17
     volumes:
       - lgsteel_chroma_data:/chroma/chroma
     ports:
