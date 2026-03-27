@@ -315,11 +315,16 @@ async function handleDelete(row: DatasourceListItem) {
     await ElMessageBox.confirm(`确认删除数据源 "${row.name}"？此操作不可恢复`, '删除确认', {
       type: 'warning',
     })
+  } catch {
+    // 用户取消
+    return
+  }
+  try {
     await deleteDatasourceAPI(row.id)
     ElMessage.success('删除成功')
     await loadDatasources()
-  } catch {
-    // 用户取消，忽略
+  } catch (err: unknown) {
+    ElMessage.error((err as Error).message || '删除失败')
   }
 }
 
