@@ -97,68 +97,87 @@ async def _async_parse_excel(
     user_id: str,
 ) -> dict[str, object]:
     """异步执行 Excel 解析和入库的核心逻辑"""
+    from sqlalchemy import update as sql_update
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
     from app.core.data_cleaner import DataCleaner
     from app.core.excel_parser import ExcelParser
-    from app.db.meta_session import _MetaSessionFactory
+    from app.db.models.datasource import Datasource
 
-    parser = ExcelParser()
-    parse_result = await parser.parse(file_path, file_path.split("/")[-1])
+    # 在 Celery forked worker 中必须创建新的引擎（避免父进程事件循环冲突）
+    meta_engine = create_async_engine(settings.meta_db_url, pool_size=2, max_overflow=2)
+    biz_engine = create_async_engine(settings.biz_db_url, pool_size=2, max_overflow=2)
+    MetaFactory = async_sessionmaker(meta_engine, class_=AsyncSession, expire_on_commit=False)
+    BizFactory = async_sessionmaker(biz_engine, class_=AsyncSession, expire_on_commit=False)
 
-    cleaner = DataCleaner()
-    load_result = await cleaner.clean_and_load(
-        parse_result=parse_result,
-        datasource_id=upload_id,
-        domain=domain,
-        update_mode=update_mode,
-    )
-
-    # 更新元数据库
-    async with _MetaSessionFactory() as session:
-        from sqlalchemy import update as sql_update
-        from app.db.models.datasource import Datasource
-
-        await session.execute(
-            sql_update(Datasource)
-            .where(Datasource.id == uuid.UUID(upload_id))
-            .values(
-                status="active",
-                biz_table_name=load_result.table_name,
-                total_rows=load_result.loaded_rows,
-            )
+    try:
+        parser = ExcelParser()
+        loop = asyncio.get_event_loop()
+        parse_result = await loop.run_in_executor(
+            None, parser.parse, file_path, file_path.split("/")[-1]
         )
-        await session.commit()
 
-    logger.info(
-        "Excel 解析任务完成",
-        upload_id=upload_id,
-        table_name=load_result.table_name,
-        loaded_rows=load_result.loaded_rows,
-    )
+        cleaner = DataCleaner(biz_session_factory=BizFactory)
+        load_result = await cleaner.clean_and_load(
+            parse_result=parse_result,
+            datasource_id=upload_id,
+            domain=domain,
+            update_mode=update_mode,
+        )
 
-    # 触发向量化任务（异步，不等待）
-    field_names = [f.display_name or f.raw_name for f in parse_result.fields]
-    embed_dictionary_task.delay(field_names=field_names, domain=domain)
+        # 更新元数据库状态为 active
+        async with MetaFactory() as session:
+            await session.execute(
+                sql_update(Datasource)
+                .where(Datasource.id == uuid.UUID(upload_id))
+                .values(
+                    status="active",
+                    biz_table_name=load_result.table_name,
+                    total_rows=load_result.rows_written,
+                )
+            )
+            await session.commit()
 
-    return {
-        "status": "success",
-        "upload_id": upload_id,
-        "table_name": load_result.table_name,
-        "loaded_rows": load_result.loaded_rows,
-    }
+        logger.info(
+            "Excel 解析任务完成",
+            upload_id=upload_id,
+            table_name=load_result.table_name,
+            loaded_rows=load_result.rows_written,
+        )
+
+        # 触发向量化任务（异步，不等待）
+        field_names = [f.clean_name or f.raw_name for f in parse_result.fields]
+        embed_dictionary_task.delay(field_names=field_names, domain=domain)
+
+        return {
+            "status": "success",
+            "upload_id": upload_id,
+            "table_name": load_result.table_name,
+            "loaded_rows": load_result.rows_written,
+        }
+    finally:
+        await biz_engine.dispose()
+        await meta_engine.dispose()
 
 
 async def _update_datasource_status(upload_id: str, new_status: str) -> None:
-    from app.db.meta_session import _MetaSessionFactory
-    from app.db.models.datasource import Datasource
     from sqlalchemy import update as sql_update
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-    async with _MetaSessionFactory() as session:
-        await session.execute(
-            sql_update(Datasource)
-            .where(Datasource.id == uuid.UUID(upload_id))
-            .values(status=new_status)
-        )
-        await session.commit()
+    from app.db.models.datasource import Datasource
+
+    engine = create_async_engine(settings.meta_db_url, pool_size=1, max_overflow=1)
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await session.execute(
+                sql_update(Datasource)
+                .where(Datasource.id == uuid.UUID(upload_id))
+                .values(status=new_status)
+            )
+            await session.commit()
+    finally:
+        await engine.dispose()
 
 
 @celery_app.task(name="app.worker.embed_dictionary_task", bind=True, max_retries=3)  # type: ignore[misc]
@@ -189,7 +208,9 @@ def embed_dictionary_task(
 
 async def _async_embed_fields(field_names: list[str], domain: str) -> dict[str, object]:
     """异步将字段名向量化写入 ChromaDB"""
+    import chromadb
     import redis.asyncio as aioredis
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
     from app.knowledge.dictionary import DataDictionaryManager
     from app.knowledge.embedding import EmbeddingService
@@ -199,11 +220,17 @@ async def _async_embed_fields(field_names: list[str], domain: str) -> dict[str, 
         encoding="utf-8",
         decode_responses=False,
     )
+    meta_engine = create_async_engine(settings.meta_db_url, pool_size=1, max_overflow=1)
+    MetaFactory = async_sessionmaker(meta_engine, class_=AsyncSession, expire_on_commit=False)
     try:
+        chroma_client = await chromadb.AsyncHttpClient(
+            host=settings.chroma_host, port=settings.chroma_port
+        )
         embed_service = EmbeddingService(redis_client=redis_client)
         dict_manager = DataDictionaryManager(
-            redis_client=redis_client,
             embedding_service=embed_service,
+            chroma_client=chroma_client,
+            meta_session_factory=MetaFactory,
         )
         for name in field_names:
             await dict_manager.upsert_field(
@@ -218,3 +245,4 @@ async def _async_embed_fields(field_names: list[str], domain: str) -> dict[str, 
         return {"status": "success", "field_count": len(field_names)}
     finally:
         await redis_client.aclose()
+        await meta_engine.dispose()

@@ -5,10 +5,10 @@ import type { LoginRequest, TokenResponse, UserRole } from '@/types'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string>(localStorage.getItem('access_token') ?? '')
-  const userId = ref<string>('')
-  const username = ref<string>('')
-  const displayName = ref<string>('')
-  const role = ref<UserRole | ''>('')
+  const userId = ref<string>(localStorage.getItem('user_id') ?? '')
+  const username = ref<string>(localStorage.getItem('username') ?? '')
+  const displayName = ref<string>(localStorage.getItem('display_name') ?? '')
+  const role = ref<UserRole | ''>(localStorage.getItem('user_role') as UserRole ?? '')
 
   const isLoggedIn = computed(() => !!token.value)
 
@@ -20,6 +20,10 @@ export const useAuthStore = defineStore('auth', () => {
     displayName.value = data.display_name
     role.value = data.role as UserRole
     localStorage.setItem('access_token', data.access_token)
+    localStorage.setItem('user_id', data.user_id)
+    localStorage.setItem('username', data.username)
+    localStorage.setItem('display_name', data.display_name)
+    localStorage.setItem('user_role', data.role)
   }
 
   async function logout(): Promise<void> {
@@ -32,6 +36,10 @@ export const useAuthStore = defineStore('auth', () => {
       displayName.value = ''
       role.value = ''
       localStorage.removeItem('access_token')
+      localStorage.removeItem('user_id')
+      localStorage.removeItem('username')
+      localStorage.removeItem('display_name')
+      localStorage.removeItem('user_role')
     }
   }
 

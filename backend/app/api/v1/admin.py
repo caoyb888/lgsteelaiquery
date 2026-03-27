@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, status
 from loguru import logger
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select, update
+from sqlalchemy import Integer, func, select, update
 
 from app.db.models.audit import AuditLog
 from app.db.models.datasource import Datasource
@@ -72,8 +72,8 @@ async def get_accuracy_stats(
         select(
             func.count(AuditLog.id).label("total"),
             func.count(AuditLog.feedback).label("with_feedback"),
-            func.sum((AuditLog.feedback == 1).cast(int)).label("thumbs_up"),
-            func.sum((AuditLog.feedback == -1).cast(int)).label("thumbs_down"),
+            func.sum((AuditLog.feedback == 1).cast(Integer)).label("thumbs_up"),
+            func.sum((AuditLog.feedback == -1).cast(Integer)).label("thumbs_down"),
             func.count(AuditLog.id).filter(AuditLog.status == "success").label("success_count"),
             func.count(AuditLog.id).filter(AuditLog.status == "failed").label("failed_count"),
             func.count(AuditLog.id).filter(AuditLog.status == "blocked").label("blocked_count"),

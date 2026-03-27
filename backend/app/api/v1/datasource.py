@@ -15,7 +15,7 @@ import uuid
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, UploadFile, status
+from fastapi import APIRouter, Form, HTTPException, UploadFile, status
 from loguru import logger
 from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
@@ -69,6 +69,9 @@ async def upload_datasource(
     file: UploadFile,
     current_user_id: CurrentUserIdDep,
     session: MetaSessionDep,
+    domain: str = Form(default="unknown"),
+    data_date: str = Form(default=""),
+    update_mode: str = Form(default="replace"),
 ) -> ApiResponse[DatasourceUploadResponse]:
     """
     上传 Excel 文件并返回字段映射预览。
@@ -119,10 +122,12 @@ async def upload_datasource(
     saved_path = upload_dir / f"{upload_id}{ext}"
     saved_path.write_bytes(content)
 
-    # 解析 Excel 获取字段预览
+    # 解析 Excel 获取字段预览（parse 为同步方法，用线程池避免阻塞事件循环）
+    import asyncio
     parser = ExcelParser()
     try:
-        parse_result = await parser.parse(str(saved_path), filename)
+        loop = asyncio.get_event_loop()
+        parse_result = await loop.run_in_executor(None, parser.parse, str(saved_path), filename)
     except Exception as exc:
         saved_path.unlink(missing_ok=True)
         logger.error("Excel 解析失败", filename=filename, error=str(exc))
@@ -131,26 +136,27 @@ async def upload_datasource(
             detail=f"Excel 解析失败：{exc}",
         ) from exc
 
-    # 字段映射（从文件名猜测数据域；默认 unknown，用户后续可修改）
-    domain = "unknown"
-    for d in ("finance", "sales", "production", "procurement"):
-        if d in filename.lower():
-            domain = d
-            break
+    # 使用前端传入的 domain（若为空则从文件名猜测）
+    if not domain or domain == "unknown":
+        domain = "unknown"
+        for d in ("finance", "sales", "production", "procurement"):
+            if d in filename.lower():
+                domain = d
+                break
 
-    mapper = FieldMapper()
+    mapper = FieldMapper(dictionary_manager=None, llm_router=None)
     candidates = await mapper.map_fields(parse_result, domain)
+
+    # 建立 raw_name -> ParsedField 的快速查找表
+    parsed_field_map = {f.raw_name: f for f in parse_result.fields}
 
     field_previews: list[FieldMappingPreview] = [
         FieldMappingPreview(
             raw_name=c.raw_name,
             std_name=c.std_name,
             display_name=c.display_name,
-            field_type=next(
-                (f.field_type for f in parse_result.fields if f.raw_name == c.raw_name),
-                "text",
-            ),
-            unit=c.unit,
+            field_type=parsed_field_map[c.raw_name].inferred_type if c.raw_name in parsed_field_map else "text",
+            unit=parsed_field_map[c.raw_name].unit if c.raw_name in parsed_field_map else None,
             confidence=c.confidence,
             needs_confirm=c.confidence < settings.field_mapping_confirm_threshold,
             mapping_source=c.mapping_source,
@@ -166,11 +172,27 @@ async def upload_datasource(
         original_filename=filename,
         file_path=str(saved_path),
         file_size_bytes=len(content),
-        data_date=date.today(),
+        data_date=date.fromisoformat(data_date) if data_date else date.today(),
+        update_mode=update_mode,
         status="pending_confirm",
         uploaded_by=current_user_id,
     )
     session.add(ds)
+
+    # 同时写入字段映射记录
+    for p in field_previews:
+        fm = FieldMapping(
+            datasource_id=uuid.UUID(upload_id),
+            raw_name=p.raw_name,
+            std_name=p.std_name,
+            display_name=p.display_name,
+            field_type=p.field_type,
+            unit=p.unit,
+            confidence=p.confidence,
+            mapping_source=p.mapping_source,
+        )
+        session.add(fm)
+
     await session.commit()
 
     logger.info(
@@ -187,7 +209,7 @@ async def upload_datasource(
             status="pending_confirm",
             preview={
                 "total_rows": parse_result.total_rows,
-                "sheets": parse_result.sheets,
+                "sheet_name": parse_result.sheet_name,
                 "domain": domain,
                 "field_mappings": [p.model_dump() for p in field_previews],
             },
@@ -214,7 +236,9 @@ async def confirm_field_mappings(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="upload_id 格式错误") from exc
 
     result = await session.execute(
-        select(Datasource).where(
+        select(Datasource)
+        .options(selectinload(Datasource.field_mappings))
+        .where(
             Datasource.id == ds_id,
             Datasource.status == "pending_confirm",
         )
