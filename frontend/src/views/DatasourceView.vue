@@ -70,17 +70,20 @@
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="80" fixed="right">
+        <el-table-column label="操作" width="100">
           <template #default="{ row }">
-            <el-button
+            <el-popconfirm
               v-if="authStore.hasRole('admin', 'data_manager')"
-              link
-              type="danger"
-              size="small"
-              @click="handleDelete(row)"
+              title="确认删除该数据源？"
+              confirm-button-text="删除"
+              cancel-button-text="取消"
+              confirm-button-type="danger"
+              @confirm="handleDelete(row)"
             >
-              删除
-            </el-button>
+              <template #reference>
+                <el-button link type="danger" size="small">删除</el-button>
+              </template>
+            </el-popconfirm>
           </template>
         </el-table-column>
       </el-table>
@@ -209,7 +212,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import {
   ArrowLeft,
   Refresh,
@@ -311,14 +314,6 @@ async function handleConfirm() {
 }
 
 async function handleDelete(row: DatasourceListItem) {
-  try {
-    await ElMessageBox.confirm(`确认删除数据源 "${row.name}"？此操作不可恢复`, '删除确认', {
-      type: 'warning',
-    })
-  } catch {
-    // 用户取消
-    return
-  }
   try {
     await deleteDatasourceAPI(row.id)
     ElMessage.success('删除成功')
